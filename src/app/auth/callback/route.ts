@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const safeNext = sanitizeRedirectPath(targetPath, '/play/friend');
+  const safeNext = sanitizeRedirectPath(targetPath, '/');
 
   // Determine true external origin (handles reverse proxy headers from Vercel)
   const forwardedHost = request.headers.get('x-forwarded-host');

@@ -198,12 +198,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data) dbProfile = data;
         } catch {}
 
+        // Load cloud learning progress if available
+        let cloudLessons: number[] = [];
+        try {
+          const { data: progressData } = await supabase
+            .from('learning_progress')
+            .select('lesson_id')
+            .eq('user_id', sessionUser.id)
+            .eq('completed', true);
+          if (progressData) {
+            cloudLessons = progressData.map((p: any) => p.lesson_id);
+          }
+        } catch {}
+
+        // Load cloud achievements if available
+        let cloudAchievements: string[] = [];
+        try {
+          const { data: achData } = await supabase
+            .from('achievements')
+            .select('achievement_id')
+            .eq('user_id', sessionUser.id);
+          if (achData) {
+            cloudAchievements = achData.map((a: any) => a.achievement_id);
+          }
+        } catch {}
+
         const finalAvatar = dbProfile?.avatar_url || resolvedAvatar || cachedUser?.avatar_url || '';
         const finalName = dbProfile?.name || resolvedName || cachedUser?.name || 'Player';
 
         // Preserve accumulated XP and level rather than resetting to default
         const currentXP = cachedUser?.xp && cachedUser.xp > 500 ? cachedUser.xp : (cachedUser?.xp || 500);
         const levelInfo = getLevelFromXP(currentXP);
+
+        const mergedLessons = Array.from(new Set([...(cachedUser?.completed_lessons || []), ...cloudLessons]));
+        const mergedAchievements = Array.from(new Set([...(cachedUser?.achievements || []), ...cloudAchievements, 'first_game']));
+        const mergedProgress = Math.round((mergedLessons.length / 25) * 100);
 
         const authUser: UserProfile = {
           id: sessionUser.id,
@@ -220,9 +249,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           draws: dbProfile?.draws ?? cachedUser?.draws ?? 0,
           ai_games: cachedUser?.ai_games || { played: 0, wins: 0, losses: 0, draws: 0 },
           friend_games: cachedUser?.friend_games || { played: 0, wins: 0, losses: 0, draws: 0 },
-          learning_progress: cachedUser?.learning_progress || 0,
-          completed_lessons: cachedUser?.completed_lessons || [],
-          achievements: cachedUser?.achievements || ['first_game'],
+          learning_progress: mergedProgress,
+          completed_lessons: mergedLessons,
+          achievements: mergedAchievements,
         };
 
         setUser(authUser);
@@ -258,6 +287,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then(async ({ data: { session } }) => {
           if (session?.user) {
             await syncSessionUser(session.user);
+          } else {
+            // No active session in Supabase: ensure unauthenticated guest fallback
+            setUser(DEFAULT_GUEST);
+            try {
+              localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
+            } catch {}
           }
         })
         .catch((err) => {
@@ -274,7 +309,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Reset to default guest on sign out
           setUser(DEFAULT_GUEST);
-          localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
+          try {
+            localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
+          } catch {}
         }
       });
 
@@ -333,6 +370,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
 
+    // Persist achievement to Supabase for authenticated users
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      (async () => {
+        try {
+          await supabase
+            .from('achievements')
+            .upsert(
+              {
+                user_id: user.id,
+                achievement_id: achievementId,
+                unlocked_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id,achievement_id' }
+            );
+        } catch {}
+      })();
+    }
+
     // Celebratory notification
     if (achDef) {
       setNotification({
@@ -350,7 +406,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async (returnUrl?: string) => {
     const supabase = getSupabase();
     if (!supabase) return;
-    const safePath = returnUrl ? sanitizeRedirectPath(returnUrl) : '/play/friend';
+    const currentPath = returnUrl || (typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/');
+    const safePath = sanitizeRedirectPath(currentPath, '/');
     if (typeof document !== 'undefined') {
       document.cookie = `funnychess_auth_return=${encodeURIComponent(safePath)}; path=/; max-age=600; SameSite=Lax`;
     }
@@ -370,7 +427,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInAsGuest = () => {
     setUser(DEFAULT_GUEST);
-    localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
+    try {
+      localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
+    } catch {}
   };
 
   const signOut = async () => {
@@ -378,7 +437,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (supabase) {
       await supabase.auth.signOut();
     }
+    try {
+      localStorage.removeItem('funnychess_user');
+      localStorage.removeItem('funnychess_game_history');
+      sessionStorage.removeItem('funnychess_auth_return');
+    } catch {}
     signInAsGuest();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   // Complete lesson
@@ -418,6 +485,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
+
+    // Persist progress to Supabase for authenticated users
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      (async () => {
+        try {
+          await supabase
+            .from('learning_progress')
+            .upsert(
+              {
+                user_id: user.id,
+                lesson_id: lessonId,
+                completed: true,
+                progress: 100,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id,lesson_id' }
+            );
+
+          await supabase
+            .from('profiles')
+            .update({
+              chess_level: levelInfo.title.en,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        } catch {}
+      })();
+    }
   };
 
   const isLessonCompleted = (lessonId: number): boolean => {
@@ -491,6 +587,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
+
+    // Persist stats to Supabase for authenticated users
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      (async () => {
+        try {
+          await supabase
+            .from('profiles')
+            .update({
+              games_played: totalPlayed,
+              wins: totalWins,
+              losses: totalLosses,
+              draws: totalDraws,
+              chess_level: levelInfo.title.en,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        } catch {}
+      })();
+    }
   };
 
   const recordGameResult = (result: 'win' | 'loss' | 'draw', difficulty: string) => {

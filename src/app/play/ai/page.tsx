@@ -15,6 +15,7 @@ import { VoiceLanguage } from '@/lib/audio/voiceSpeech';
 import { sounds } from '@/lib/audio/soundEffects';
 import { useTranslation, Language } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { 
   Bot, 
   Sparkles, 
@@ -32,6 +33,14 @@ import {
 } from 'lucide-react';
 
 export default function PlayAIPage() {
+  return (
+    <ProtectedRoute feature="ai">
+      <PlayAIContent />
+    </ProtectedRoute>
+  );
+}
+
+function PlayAIContent() {
   const { language, t } = useTranslation();
   const { recordGameResult } = useAuth();
 

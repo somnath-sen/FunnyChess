@@ -13,6 +13,20 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/progress',
+        destination: '/profile',
+        permanent: true,
+      },
+      {
+        source: '/achievements',
+        destination: '/profile',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

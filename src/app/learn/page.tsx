@@ -5,6 +5,7 @@ import { useTranslation } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ALL_LESSONS, LessonData } from '@/data/lessonsData';
 import { LessonViewer } from '@/components/Learn/LessonViewer';
+import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { 
   BookOpen, 
   Sparkles, 
@@ -18,6 +19,14 @@ import {
 } from 'lucide-react';
 
 export default function LearnPage() {
+  return (
+    <ProtectedRoute feature="learn">
+      <LearnContent />
+    </ProtectedRoute>
+  );
+}
+
+function LearnContent() {
   const { t } = useTranslation();
   const { user, isLessonCompleted } = useAuth();
   const [activeLesson, setActiveLesson] = useState<LessonData | null>(null);

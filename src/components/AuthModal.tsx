@@ -90,7 +90,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <button
             onClick={async () => {
-              await signInWithGoogle();
+              const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+              await signInWithGoogle(currentPath);
               onClose();
             }}
             style={{
@@ -107,6 +108,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               fontSize: '1rem',
               transition: 'all 0.2s ease',
               boxShadow: '0 4px 12px rgba(255, 255, 255, 0.15)',
+              cursor: 'pointer',
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
@@ -128,17 +130,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               />
             </svg>
             <span>{t('auth.continueGoogle', 'Continue with Google')}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              signInAsGuest();
-              onClose();
-            }}
-            className="btn-secondary"
-            style={{ width: '100%', fontSize: '0.95rem' }}
-          >
-            <span>{t('auth.continueGuest', 'Play as Guest (Zero Setup)')}</span>
           </button>
         </div>
 

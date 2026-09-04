@@ -23,7 +23,7 @@ import {
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const { language, setLanguage, t } = useTranslation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -244,7 +244,7 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Auth / Profile Pill */}
-            {user ? (
+            {isAuthenticated && user ? (
               <Link
                 href="/profile"
                 style={{
@@ -351,6 +351,28 @@ export const Navbar: React.FC = () => {
                 </Link>
               );
             })}
+            {!isAuthenticated && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsAuthOpen(true);
+                }}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem',
+                  padding: '0.75rem 1rem',
+                  marginTop: '0.4rem',
+                  fontSize: '1rem',
+                  width: '100%',
+                }}
+              >
+                <LogIn size={18} />
+                <span>{t('nav.signIn', 'Sign In')}</span>
+              </button>
+            )}
           </div>
         )}
       </header>

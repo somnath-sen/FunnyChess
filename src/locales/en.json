@@ -160,5 +160,23 @@
     "invitedDuel": "invited you to a live chess duel on FunnyChess!",
     "acceptChallenge": "Accept Challenge & Play",
     "soloAlt": "Want to play without signing in? Play with Funny AI →"
+  },
+  "auth": {
+    "signInToContinue": "Sign in to continue",
+    "signInToStartLearning": "Sign in to start learning",
+    "signInToPlay": "Sign in to play",
+    "signInToPlayFriend": "Sign in to play with a friend",
+    "signInToJoinGame": "Sign in to join this game",
+    "authRequired": "Authentication required",
+    "signInWithGoogle": "Sign in with Google",
+    "checkingAccount": "Checking your account...",
+    "returningToGame": "Returning to your game...",
+    "pleaseSignInToContinue": "Please sign in to continue",
+    "subtitleContinue": "Your chess journey, game history, and achievements are saved to your account.",
+    "subtitleLearn": "Create your chess learning journey, save your progress, earn XP, and unlock achievements.",
+    "subtitlePlayAI": "Save your games, track your progress, and challenge FunnyChess AI.",
+    "subtitlePlayFriend": "Create private chess rooms, invite your friends, and keep your games synchronized across devices.",
+    "subtitleJoinGame": "Sign in to join this match and play live against your friend.",
+    "secureFree": "Secure • 100% Free Forever • No Ads"
   }
 }

@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation, LANGUAGES, Language } from '@/context/LanguageContext';
-import { AuthModal } from '@/components/AuthModal';
 import { UserAvatar } from '@/components/UserAvatar';
+import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { 
   ACHIEVEMENTS_DATA, 
   getLevelFromXP, 
@@ -37,11 +37,18 @@ import {
 } from 'lucide-react';
 
 export default function ProfilePage() {
+  return (
+    <ProtectedRoute feature="profile">
+      <ProfileContent />
+    </ProtectedRoute>
+  );
+}
+
+function ProfileContent() {
   const { user, signOut, updateAvatar } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const speech = useSpeech(language as any);
 
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
   const [activeStatsTab, setActiveStatsTab] = useState<'all' | 'ai' | 'friend'>('all');
   const [recentGames, setRecentGames] = useState<PersistedGameRecord[]>([]);
@@ -212,36 +219,25 @@ export default function ProfilePage() {
 
         {/* Action Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {user.isGuest ? (
-            <button
-              onClick={() => setIsAuthOpen(true)}
-              className="btn-primary"
-              style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}
-            >
-              <Sparkles size={16} />
-              <span>Link Google Account</span>
-            </button>
-          ) : (
-            <button
-              onClick={signOut}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.6rem 1.1rem',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              <LogOut size={16} />
-              <span>Sign Out</span>
-            </button>
-          )}
+          <button
+            onClick={signOut}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.6rem 1.1rem',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#f87171',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            <LogOut size={16} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
 
@@ -692,8 +688,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Auth Modal if guest wants to link account */}
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
 
       {/* Game Replay Modal */}
       {selectedReplayGame && (
