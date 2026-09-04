@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { gameService } from '@/lib/multiplayer/gameService';
+import { getSiteUrl } from '@/lib/url';
 import { 
   Users, 
   Link as LinkIcon, 
@@ -55,7 +56,7 @@ export default function PlayFriendPage() {
 
   const getInviteUrl = () => {
     if (!createdGameCode) return '';
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://funnychess.app';
+    const origin = getSiteUrl();
     return `${origin}/game/${createdGameCode}`;
   };
 

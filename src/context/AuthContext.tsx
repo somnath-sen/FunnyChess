@@ -10,6 +10,7 @@ import {
 } from '@/lib/gamification/gamificationService';
 import { sounds } from '@/lib/audio/soundEffects';
 import confetti from 'canvas-confetti';
+import { getAuthCallbackUrl } from '@/lib/url';
 
 export interface GameModeStats {
   played: number;
@@ -325,14 +326,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Sign in with Google
+  // Sign in with Google (Environment-aware OAuth redirect)
   const signInWithGoogle = async () => {
     const supabase = getSupabase();
     if (!supabase) return;
+    const redirectUrl = getAuthCallbackUrl();
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   };
