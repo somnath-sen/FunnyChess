@@ -92,6 +92,9 @@ export const metadata: Metadata = {
     },
   },
   manifest: '/manifest.json',
+  verification: {
+    google: 'kPHwXiufQV9_d-doGILS4d08ixorfD7wEzSdE7FI_qI',
+  },
   icons: {
     icon: '/images/brand/chess-king.png',
     shortcut: '/images/brand/chess-king.png',
@@ -107,6 +110,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="google-site-verification" content="kPHwXiufQV9_d-doGILS4d08ixorfD7wEzSdE7FI_qI" />
         <StructuredData />
       </head>
       <body>
