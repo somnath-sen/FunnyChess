@@ -14,7 +14,7 @@ FunnyChess is a modern, interactive, and humorous chess learning & playing web p
 - **Knowledge Checks**: Fun, low-stress quizzes at the end of every module to reinforce concepts.
 
 ### 🤖 Play with AI & Hilarious Commentary
-- **Dynamic Difficulty Levels**: Tailored AI engine settings (Novice, Casual, Serious).
+- **Client-Side Engine**: Custom local minimax chess AI with alpha-beta pruning, positional piece-square evaluation, and 3 difficulty tiers (Novice, Casual, Serious).
 - **Funny Trash Talk & Commentary**: Real-time quips and commentary on brilliant moves, blunders, and funny positions.
 - **Multi-Language Speech Synthesis**: Browser-powered voice commentary supporting **English**, **Hindi (हिंदी)**, and **Bengali (বাংলা)**.
 
@@ -24,7 +24,7 @@ FunnyChess is a modern, interactive, and humorous chess learning & playing web p
 - **Reconnection Handling**: Smooth reconnection logic preserving current board state and turn history.
 
 ### ⚡ HACK Mode (Position & Threat Analysis)
-- **Deep Evaluation**: Instant engine evaluation of the current board state.
+- **Position Evaluation**: Tactical position analysis powered by the local heuristic evaluation engine.
 - **Visual Tactics & Arrows**: On-board visual arrows illustrating the best move, alternative lines, and immediate opponent threats.
 - **Educational Explanations**: Plain-language breakdowns explaining *why* a move is strong or dangerous.
 
@@ -42,7 +42,7 @@ FunnyChess is a modern, interactive, and humorous chess learning & playing web p
 
 - **Framework**: [Next.js 14](https://nextjs.org/) (App Router)
 - **Frontend**: [React 18](https://react.dev/), [TypeScript](https://www.typescriptlang.org/)
-- **Chess Engine & Logic**: [chess.js](https://github.com/jhlywa/chess.js), custom heuristic & evaluation engine
+- **Chess Engine & Logic**: [chess.js](https://github.com/jhlywa/chess.js), custom client-side minimax engine with alpha-beta pruning, positional piece-square evaluation, and difficulty scaling
 - **Styling**: Vanilla CSS Modules & Modern CSS design tokens (responsive, dark mode)
 - **Icons & Effects**: [Lucide React](https://lucide.dev/), [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti)
 - **Backend & Database**: [Supabase](https://supabase.com/) (Auth, PostgreSQL Database, Realtime subscriptions)
