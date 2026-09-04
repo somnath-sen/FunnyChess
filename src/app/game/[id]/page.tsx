@@ -59,6 +59,9 @@ export default function MultiplayerGamePage() {
 
   // Game Room state
   const [game, setGame] = useState<MultiplayerGame | null>(null);
+  const gameRef = useRef<MultiplayerGame | null>(null);
+  gameRef.current = game;
+
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -107,6 +110,9 @@ export default function MultiplayerGamePage() {
     speech.speak(comment, { priority, lang: speech.voiceLanguage });
   }, [speech]);
 
+  const triggerCommentRef = useRef(triggerComment);
+  triggerCommentRef.current = triggerComment;
+
   // Load and subscribe to game
   useEffect(() => {
     if (!gameId) return;
@@ -123,7 +129,8 @@ export default function MultiplayerGamePage() {
     let isSubscribed = true;
 
     async function loadGame() {
-      setLoading(true);
+      // Only show full-screen connecting spinner if we don't already have game data
+      setLoading((prev) => (gameRef.current ? false : prev));
       setErrorStatus(null);
       setErrorMessage('');
 
@@ -196,7 +203,7 @@ export default function MultiplayerGamePage() {
           setOpponentJustJoined(true);
           sounds.playSuccess();
           confetti({ particleCount: 75, spread: 70 });
-          triggerComment('game_start', 'high');
+          triggerCommentRef.current('game_start', 'high');
           setTimeout(() => {
             setOpponentJustJoined(false);
           }, 4500);
@@ -216,7 +223,7 @@ export default function MultiplayerGamePage() {
       // Handle real-time audio and speech triggers
       if (event === 'player_joined') {
         sounds.playSuccess();
-        triggerComment('game_start');
+        triggerCommentRef.current('game_start');
       } else if (event === 'chess_move' && meta?.move) {
         const move = meta.move;
         const currentTurn = updatedGame.current_turn;
@@ -238,46 +245,46 @@ export default function MultiplayerGamePage() {
         // Trigger funny speech for checks and captures
         if (move.san && move.san.includes('+')) {
           if (movedByOpponent) {
-            triggerComment('friend_gives_check', 'high');
+            triggerCommentRef.current('friend_gives_check', 'high');
           } else {
-            triggerComment('you_give_check', 'high');
+            triggerCommentRef.current('you_give_check', 'high');
           }
         } else if (move.captured === 'q') {
           sounds.playCapture();
           if (movedByOpponent) {
-            triggerComment('friend_captures_queen');
+            triggerCommentRef.current('friend_captures_queen');
           } else {
-            triggerComment('you_capture_queen');
+            triggerCommentRef.current('you_capture_queen');
           }
         } else if (move.captured) {
           if (movedByOpponent) {
-            triggerComment('friend_captures_piece');
+            triggerCommentRef.current('friend_captures_piece');
           } else {
-            triggerComment('you_capture_piece');
+            triggerCommentRef.current('you_capture_piece');
           }
         }
 
         if (updatedGame.status === 'completed') {
           if (updatedGame.winner === currentRole) {
-            triggerComment('checkmate_you_win', 'high');
+            triggerCommentRef.current('checkmate_you_win', 'high');
             confetti({ particleCount: 80, spread: 70 });
           } else if (updatedGame.winner === 'draw') {
-            triggerComment('draw', 'high');
+            triggerCommentRef.current('draw', 'high');
           } else {
-            triggerComment('checkmate_friend_wins', 'high');
+            triggerCommentRef.current('checkmate_friend_wins', 'high');
           }
         }
       } else if (event === 'game_resigned') {
         if (meta?.resignedBy !== myRoleRef.current) {
-          triggerComment('checkmate_you_win', 'high');
+          triggerCommentRef.current('checkmate_you_win', 'high');
           confetti({ particleCount: 80, spread: 70 });
         } else {
-          triggerComment('resigned', 'high');
+          triggerCommentRef.current('resigned', 'high');
         }
       } else if (event === 'draw_offered' && meta?.offeredBy !== myRoleRef.current) {
         setDrawOfferPending(true);
       } else if (event === 'draw_accepted') {
-        triggerComment('draw', 'high');
+        triggerCommentRef.current('draw', 'high');
         setDrawOfferPending(false);
       }
     });
@@ -289,7 +296,7 @@ export default function MultiplayerGamePage() {
       window.removeEventListener('online', handleRecheck);
       unsubscribe();
     };
-  }, [gameId, playerId, isAuthenticated, authLoading, updateMyRole, triggerComment]);
+  }, [gameId, playerId, isAuthenticated, authLoading, updateMyRole]);
 
   // Join as player 2 strictly authenticated
   const handleJoinGame = async () => {
@@ -509,7 +516,7 @@ export default function MultiplayerGamePage() {
   }
 
   // 3. Loading Game Room State
-  if (loading) {
+  if (loading && !game) {
     return (
       <div className="container" style={{ padding: '6rem 1rem', textAlign: 'center' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: '1rem', animation: 'pulseSubtle 1s infinite' }}>
@@ -521,8 +528,8 @@ export default function MultiplayerGamePage() {
     );
   }
 
-  // 4. Classified Error States
-  if (errorStatus || !game) {
+  // 4. Classified Error States (game is missing or error occurred)
+  if (!game) {
     let errorTitle = 'Game Not Found';
     let errorEmoji = '😅';
     let errorDescription = 'This room code doesn’t exist or has expired. Check your invite link or create a new room!';
