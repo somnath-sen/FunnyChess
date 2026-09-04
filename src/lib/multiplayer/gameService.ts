@@ -41,6 +41,11 @@ export async function getAuthenticatedUser() {
   const supabase = getSupabase();
   if (!supabase) return null;
   try {
+    // 1. Fast path: check cached active session in localStorage immediately
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) return session.user;
+
+    // 2. Fallback to server check
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return null;
     return user;

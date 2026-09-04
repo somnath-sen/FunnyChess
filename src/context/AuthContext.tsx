@@ -249,12 +249,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        if (session?.user) {
-          await syncSessionUser(session.user);
-        }
+      // Safety fallback: Never leave auth loading stuck beyond 3.5 seconds
+      const timeoutId = setTimeout(() => {
         setLoading(false);
-      });
+      }, 3500);
+
+      supabase.auth.getSession()
+        .then(async ({ data: { session } }) => {
+          if (session?.user) {
+            await syncSessionUser(session.user);
+          }
+        })
+        .catch((err) => {
+          console.warn('[AuthContext] getSession error:', err);
+        })
+        .finally(() => {
+          clearTimeout(timeoutId);
+          setLoading(false);
+        });
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
@@ -266,7 +278,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      return () => subscription.unsubscribe();
+      return () => {
+        clearTimeout(timeoutId);
+        subscription.unsubscribe();
+      };
     } else {
       setLoading(false);
     }

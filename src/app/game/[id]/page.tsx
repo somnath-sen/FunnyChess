@@ -47,8 +47,15 @@ export default function MultiplayerGamePage() {
   const speech = useSpeech(language as any);
 
   // Identity state
+  // Identity state
   const playerId = user?.id || '';
   const [myRole, setMyRole] = useState<PlayerRole>('spectator');
+  const myRoleRef = useRef<PlayerRole>('spectator');
+
+  const updateMyRole = useCallback((role: PlayerRole) => {
+    myRoleRef.current = role;
+    setMyRole(role);
+  }, []);
 
   // Game Room state
   const [game, setGame] = useState<MultiplayerGame | null>(null);
@@ -102,7 +109,16 @@ export default function MultiplayerGamePage() {
 
   // Load and subscribe to game
   useEffect(() => {
-    if (!gameId || !isAuthenticated || !playerId) return;
+    if (!gameId) return;
+
+    // While auth is still actively verifying, wait
+    if (authLoading) return;
+
+    // If auth verification finished and user is not signed in, cancel room loading
+    if (!isAuthenticated || !playerId) {
+      setLoading(false);
+      return;
+    }
 
     let isSubscribed = true;
 
@@ -111,40 +127,61 @@ export default function MultiplayerGamePage() {
       setErrorStatus(null);
       setErrorMessage('');
 
-      const res = await gameService.getGameDetails(gameId);
-      if (!isSubscribed) return;
+      try {
+        const res = await gameService.getGameDetails(gameId);
+        if (!isSubscribed) return;
 
-      if (!res.success) {
-        setErrorStatus(res.error);
-        setErrorMessage(res.message || '');
-        setLoading(false);
-        return;
+        if (!res.success) {
+          setErrorStatus(res.error);
+          setErrorMessage(res.message || '');
+          return;
+        }
+
+        const data = res.game;
+        setGame(data);
+
+        // Determine player's role
+        if (data.player_white === playerId) {
+          updateMyRole('white');
+        } else if (data.player_black === playerId) {
+          updateMyRole('black');
+        } else {
+          updateMyRole('spectator');
+        }
+      } catch (err: any) {
+        console.error('[MultiplayerGamePage] loadGame exception:', err);
+        if (isSubscribed) {
+          setErrorStatus('network_error');
+          setErrorMessage(err?.message || 'Failed to load game room');
+        }
+      } finally {
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
-
-      const data = res.game;
-      setGame(data);
-
-      // Determine player's role
-      if (data.player_white === playerId) {
-        setMyRole('white');
-      } else if (data.player_black === playerId) {
-        setMyRole('black');
-      } else {
-        setMyRole('spectator');
-      }
-
-      setLoading(false);
     }
 
     loadGame();
+
+    // Safety fallback: Never allow "Connecting to Game Room" to hang indefinitely
+    const safetyTimer = setTimeout(() => {
+      if (isSubscribed) {
+        setLoading(false);
+      }
+    }, 6000);
 
     // Auto-resync when returning to tab or coming back online
     const handleRecheck = () => {
       gameService.getGameDetails(gameId).then((res) => {
         if (isSubscribed && res.success) {
           setGame(res.game);
+          if (res.game.player_white === playerId) {
+            updateMyRole('white');
+          } else if (res.game.player_black === playerId) {
+            updateMyRole('black');
+          }
         }
-      });
+      }).catch(() => {});
     };
     window.addEventListener('focus', handleRecheck);
     window.addEventListener('online', handleRecheck);
@@ -169,11 +206,11 @@ export default function MultiplayerGamePage() {
 
       // Update role if newly assigned or matched
       if (updatedGame.player_white === playerId) {
-        setMyRole('white');
+        updateMyRole('white');
       } else if (updatedGame.player_black === playerId) {
-        setMyRole('black');
+        updateMyRole('black');
       } else {
-        setMyRole('spectator');
+        updateMyRole('spectator');
       }
 
       // Handle real-time audio and speech triggers
@@ -183,8 +220,9 @@ export default function MultiplayerGamePage() {
       } else if (event === 'chess_move' && meta?.move) {
         const move = meta.move;
         const currentTurn = updatedGame.current_turn;
-        const movedByOpponent = (myRole === 'white' && currentTurn === 'w') ||
-                                (myRole === 'black' && currentTurn === 'b');
+        const currentRole = myRoleRef.current;
+        const movedByOpponent = (currentRole === 'white' && currentTurn === 'w') ||
+                                (currentRole === 'black' && currentTurn === 'b');
 
         sounds.playMove();
 
@@ -220,7 +258,7 @@ export default function MultiplayerGamePage() {
         }
 
         if (updatedGame.status === 'completed') {
-          if (updatedGame.winner === myRole) {
+          if (updatedGame.winner === currentRole) {
             triggerComment('checkmate_you_win', 'high');
             confetti({ particleCount: 80, spread: 70 });
           } else if (updatedGame.winner === 'draw') {
@@ -230,13 +268,13 @@ export default function MultiplayerGamePage() {
           }
         }
       } else if (event === 'game_resigned') {
-        if (meta?.resignedBy !== myRole) {
+        if (meta?.resignedBy !== myRoleRef.current) {
           triggerComment('checkmate_you_win', 'high');
           confetti({ particleCount: 80, spread: 70 });
         } else {
           triggerComment('resigned', 'high');
         }
-      } else if (event === 'draw_offered' && meta?.offeredBy !== myRole) {
+      } else if (event === 'draw_offered' && meta?.offeredBy !== myRoleRef.current) {
         setDrawOfferPending(true);
       } else if (event === 'draw_accepted') {
         triggerComment('draw', 'high');
@@ -246,11 +284,12 @@ export default function MultiplayerGamePage() {
 
     return () => {
       isSubscribed = false;
+      clearTimeout(safetyTimer);
       window.removeEventListener('focus', handleRecheck);
       window.removeEventListener('online', handleRecheck);
       unsubscribe();
     };
-  }, [gameId, playerId, myRole, isAuthenticated, triggerComment]);
+  }, [gameId, playerId, isAuthenticated, authLoading, updateMyRole, triggerComment]);
 
   // Join as player 2 strictly authenticated
   const handleJoinGame = async () => {
@@ -276,7 +315,7 @@ export default function MultiplayerGamePage() {
     }
 
     setGame(res.game);
-    setMyRole(res.role);
+    updateMyRole(res.role);
     setJoining(false);
     sounds.playSuccess();
     triggerComment('game_start');
@@ -489,7 +528,11 @@ export default function MultiplayerGamePage() {
     let errorDescription = 'This room code doesn’t exist or has expired. Check your invite link or create a new room!';
     let showRetry = false;
 
-    if (errorStatus === 'db_error') {
+    if (errorStatus === 'not_authenticated') {
+      errorTitle = 'Sign In Required';
+      errorEmoji = '🔒';
+      errorDescription = 'Please sign in with your Google account to join this match.';
+    } else if (errorStatus === 'db_error') {
       errorTitle = 'Database Connection Issue';
       errorEmoji = '🔌';
       errorDescription = errorMessage || 'Could not connect to the multiplayer database. Please make sure the database migration has been run in Supabase, or check your connection.';
