@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation, LANGUAGES, Language } from '@/context/LanguageContext';
 import { AuthModal } from '@/components/AuthModal';
+import { UserAvatar } from '@/components/UserAvatar';
 import { 
   ACHIEVEMENTS_DATA, 
   getLevelFromXP, 
@@ -31,11 +32,12 @@ import {
   Play,
   RotateCcw,
   Volume2,
-  Calendar
+  Calendar,
+  Camera
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateAvatar } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const speech = useSpeech(language as any);
 
@@ -44,6 +46,24 @@ export default function ProfilePage() {
   const [activeStatsTab, setActiveStatsTab] = useState<'all' | 'ai' | 'friend'>('all');
   const [recentGames, setRecentGames] = useState<PersistedGameRecord[]>([]);
   const [selectedReplayGame, setSelectedReplayGame] = useState<PersistedGameRecord | null>(null);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size should be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      if (typeof reader.result === 'string') {
+        await updateAvatar(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Load persisted game records
   useEffect(() => {
@@ -120,39 +140,46 @@ export default function ProfilePage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          {/* Avatar */}
-          {user.avatar_url ? (
-            <img
+          {/* Avatar Container with Upload Badge */}
+          <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
+            <UserAvatar
               src={user.avatar_url}
-              alt={user.name}
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '24px',
-                border: '2px solid var(--accent-gold)',
-                objectFit: 'cover',
-                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
-              }}
+              name={user.name}
+              size={80}
+              borderRadius="24px"
+              border="2px solid var(--accent-gold)"
+              boxShadow="0 8px 24px rgba(245, 158, 11, 0.35)"
             />
-          ) : (
-            <div
+            <label
+              htmlFor="avatar-upload-input"
+              title="Upload Custom Profile Picture"
               style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '24px',
-                background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                position: 'absolute',
+                bottom: '-4px',
+                right: '-4px',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--accent-gold)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2.2rem',
-                fontWeight: 900,
-                color: '#ffffff',
-                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
+                border: '2px solid #0d121c',
+                transition: 'transform 0.15s ease',
               }}
             >
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+              <Camera size={14} color="#000000" />
+              <input
+                id="avatar-upload-input"
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarUpload}
+              />
+            </label>
+          </div>
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>

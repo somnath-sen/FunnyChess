@@ -60,6 +60,62 @@ interface AuthContextType {
   isLessonCompleted: (lessonId: number) => boolean;
   recordDetailedGame: (game: PersistedGameRecord) => void;
   recordGameResult: (result: 'win' | 'loss' | 'draw', difficulty: string) => void;
+  updateAvatar: (newAvatarUrl: string) => Promise<void>;
+}
+
+/**
+ * Robustly resolve avatar URL across all common Google OAuth and Supabase identity metadata fields
+ */
+export function resolveAvatarUrl(supabaseUser: any, fallbackAvatar?: string): string {
+  if (!supabaseUser) return fallbackAvatar || '';
+  const meta = supabaseUser.user_metadata || {};
+  const identities = Array.isArray(supabaseUser.identities) ? supabaseUser.identities : [];
+  const identityData = identities[0]?.identity_data || {};
+
+  const candidate =
+    meta.avatar_url ||
+    meta.picture ||
+    meta.photoURL ||
+    meta.image ||
+    meta.avatar ||
+    identityData.avatar_url ||
+    identityData.picture ||
+    identityData.photoURL ||
+    identityData.image ||
+    identityData.avatar ||
+    fallbackAvatar ||
+    '';
+
+  if (typeof candidate === 'string' && candidate.trim()) {
+    let cleanUrl = candidate.trim();
+    if (cleanUrl.startsWith('//')) {
+      cleanUrl = 'https:' + cleanUrl;
+    }
+    return cleanUrl;
+  }
+
+  return fallbackAvatar || '';
+}
+
+export function resolveUserName(supabaseUser: any, fallbackName?: string): string {
+  if (!supabaseUser) return fallbackName || 'Player';
+  const meta = supabaseUser.user_metadata || {};
+  const identities = Array.isArray(supabaseUser.identities) ? supabaseUser.identities : [];
+  const identityData = identities[0]?.identity_data || {};
+
+  const candidate =
+    meta.full_name ||
+    meta.name ||
+    meta.user_name ||
+    meta.preferred_username ||
+    identityData.full_name ||
+    identityData.name ||
+    identityData.user_name ||
+    fallbackName ||
+    supabaseUser.email?.split('@')[0] ||
+    'Player';
+
+  return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : 'Player';
 }
 
 const DEFAULT_GUEST: UserProfile = {
@@ -117,56 +173,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. If Supabase is configured, listen to real session
     const supabase = getSupabase();
     if (supabase) {
+      const syncSessionUser = async (sessionUser: any) => {
+        if (!sessionUser) return;
+
+        let cachedUser: UserProfile | null = null;
+        try {
+          const saved = localStorage.getItem('funnychess_user');
+          if (saved) cachedUser = JSON.parse(saved);
+        } catch {}
+
+        const resolvedAvatar = resolveAvatarUrl(sessionUser, cachedUser?.avatar_url);
+        const resolvedName = resolveUserName(sessionUser, cachedUser?.name);
+
+        // Attempt to load cloud profile from Supabase if table exists
+        let dbProfile: any = null;
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', sessionUser.id)
+            .maybeSingle();
+          if (data) dbProfile = data;
+        } catch {}
+
+        const finalAvatar = dbProfile?.avatar_url || resolvedAvatar || cachedUser?.avatar_url || '';
+        const finalName = dbProfile?.name || resolvedName || cachedUser?.name || 'Player';
+
+        // Preserve accumulated XP and level rather than resetting to default
+        const currentXP = cachedUser?.xp && cachedUser.xp > 500 ? cachedUser.xp : (cachedUser?.xp || 500);
+        const levelInfo = getLevelFromXP(currentXP);
+
+        const authUser: UserProfile = {
+          id: sessionUser.id,
+          name: finalName,
+          email: sessionUser.email || dbProfile?.email || cachedUser?.email || '',
+          avatar_url: finalAvatar,
+          isGuest: false,
+          xp: currentXP,
+          chess_level: levelInfo.title.en,
+          chess_level_number: levelInfo.level,
+          games_played: dbProfile?.games_played ?? cachedUser?.games_played ?? 0,
+          wins: dbProfile?.wins ?? cachedUser?.wins ?? 0,
+          losses: dbProfile?.losses ?? cachedUser?.losses ?? 0,
+          draws: dbProfile?.draws ?? cachedUser?.draws ?? 0,
+          ai_games: cachedUser?.ai_games || { played: 0, wins: 0, losses: 0, draws: 0 },
+          friend_games: cachedUser?.friend_games || { played: 0, wins: 0, losses: 0, draws: 0 },
+          learning_progress: cachedUser?.learning_progress || 0,
+          completed_lessons: cachedUser?.completed_lessons || [],
+          achievements: cachedUser?.achievements || ['first_game'],
+        };
+
+        setUser(authUser);
+        try {
+          localStorage.setItem('funnychess_user', JSON.stringify(authUser));
+        } catch {}
+
+        // Ensure Supabase profiles table stores the resolved avatar_url if connected
+        if (finalAvatar) {
+          try {
+            await supabase
+              .from('profiles')
+              .upsert(
+                {
+                  id: sessionUser.id,
+                  name: finalName,
+                  email: sessionUser.email,
+                  avatar_url: finalAvatar,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+              );
+          } catch {}
+        }
+      };
+
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          const authUser: UserProfile = {
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Player',
-            email: session.user.email || '',
-            avatar_url: session.user.user_metadata?.avatar_url || '',
-            isGuest: false,
-            xp: 500,
-            chess_level: 'Piece Explorer',
-            chess_level_number: 2,
-            games_played: 0,
-            wins: 0,
-            losses: 0,
-            draws: 0,
-            ai_games: { played: 0, wins: 0, losses: 0, draws: 0 },
-            friend_games: { played: 0, wins: 0, losses: 0, draws: 0 },
-            learning_progress: 0,
-            completed_lessons: [],
-            achievements: ['first_game'],
-          };
-          setUser(authUser);
-          localStorage.setItem('funnychess_user', JSON.stringify(authUser));
+          syncSessionUser(session.user);
         }
         setLoading(false);
       });
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
-          const authUser: UserProfile = {
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Player',
-            email: session.user.email || '',
-            avatar_url: session.user.user_metadata?.avatar_url || '',
-            isGuest: false,
-            xp: 500,
-            chess_level: 'Piece Explorer',
-            chess_level_number: 2,
-            games_played: 0,
-            wins: 0,
-            losses: 0,
-            draws: 0,
-            ai_games: { played: 0, wins: 0, losses: 0, draws: 0 },
-            friend_games: { played: 0, wins: 0, losses: 0, draws: 0 },
-            learning_progress: 0,
-            completed_lessons: [],
-            achievements: ['first_game'],
-          };
-          setUser(authUser);
-          localStorage.setItem('funnychess_user', JSON.stringify(authUser));
+          syncSessionUser(session.user);
         }
       });
 
@@ -386,6 +476,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // Update custom avatar URL (from file upload or manual URL)
+  const updateAvatar = async (newAvatarUrl: string) => {
+    if (!user) return;
+    const updated: UserProfile = {
+      ...user,
+      avatar_url: newAvatarUrl,
+    };
+    setUser(updated);
+    try {
+      localStorage.setItem('funnychess_user', JSON.stringify(updated));
+    } catch {}
+
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            avatar_url: newAvatarUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+      } catch {}
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -403,6 +519,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLessonCompleted,
         recordDetailedGame,
         recordGameResult,
+        updateAvatar,
       }}
     >
       {children}

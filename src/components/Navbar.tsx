@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTranslation, LANGUAGES, Language } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from '@/components/AuthModal';
+import { UserAvatar } from '@/components/UserAvatar';
 import { 
   BookOpen, 
   Bot, 
@@ -259,22 +260,13 @@ export const Navbar: React.FC = () => {
                   fontWeight: 600,
                 }}
               >
-                <div
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--accent-gold)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: '#000',
-                  }}
-                >
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
+                <UserAvatar
+                  src={user.avatar_url}
+                  name={user.name}
+                  size={24}
+                  borderRadius="50%"
+                  border="1px solid var(--accent-gold)"
+                />
                 <span
                   style={{
                     maxWidth: '120px',

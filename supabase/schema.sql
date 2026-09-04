@@ -44,7 +44,7 @@ BEGIN
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Funny Chess Player'),
     new.email,
-    COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', ''),
+    COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', new.raw_user_meta_data->>'photoURL', new.raw_user_meta_data->>'image', ''),
     'en',
     'en'
   );
