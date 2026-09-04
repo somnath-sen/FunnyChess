@@ -105,11 +105,11 @@ export const HeroSection: React.FC = () => {
               fontSize: 'clamp(2.5rem, 5.8vw, 4.6rem)',
               letterSpacing: '-0.03em',
               lineHeight: 1.12,
-              marginBottom: '1.5rem',
+              marginBottom: '1.25rem',
               fontWeight: 900,
             }}
           >
-            {t('hero.titlePrefix', 'Chess is not hard.')}{' '}
+            FunnyChess —{' '}
             <span
               style={{
                 background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 45%, #f43f5e 100%)',
@@ -119,14 +119,25 @@ export const HeroSection: React.FC = () => {
                 textShadow: '0 0 35px rgba(245, 158, 11, 0.2)',
               }}
             >
-              {t('hero.titleHighlight', "You just haven't learned it the fun way yet.")}
+              Learn. Laugh. Play.
             </span>
           </h1>
 
-          {/* Subtitle */}
+          {/* Subtitle & Tagline */}
           <p
             style={{
-              fontSize: 'clamp(1.05rem, 2vw, 1.25rem)',
+              fontSize: 'clamp(1.08rem, 2vw, 1.25rem)',
+              fontWeight: 600,
+              color: '#f8fafc',
+              marginBottom: '0.75rem',
+            }}
+          >
+            {t('hero.tagline', 'Chess is not hard. You just haven’t learned it the fun way yet.')}
+          </p>
+
+          <p
+            style={{
+              fontSize: 'clamp(0.95rem, 1.7vw, 1.1rem)',
               color: 'var(--text-secondary)',
               lineHeight: 1.65,
               maxWidth: '820px',
@@ -135,7 +146,7 @@ export const HeroSection: React.FC = () => {
           >
             {t(
               'hero.subtitle',
-              'Stop reading 400-page boring textbooks. Learn piece movements with jokes, practice with a friendly witty AI, and use HACK Mode to understand every mistake!'
+              'A fun and beginner-friendly way to learn and play chess. Play against AI, learn chess lessons, challenge friends and use HACK mode to understand mistakes.'
             )}
           </p>
 

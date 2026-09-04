@@ -237,7 +237,7 @@ export const FounderSection: React.FC = () => {
 
               {/* Connect Label */}
               <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '0.75rem' }}>
-                {t('founder.connectWith', 'Connect with Somnath')}
+                {t('founder.connectWith', 'Connect with Somnath (@thesomishere)')}
               </div>
 
               {/* Floating Pill Social Badges */}

@@ -203,7 +203,7 @@ export const Footer: React.FC = () => {
           }}
         >
           <div>
-            © {new Date().getFullYear()} FunnyChess. {t('footer.rights', 'Built with passion & ₹0 initial budget.')}
+            © {new Date().getFullYear()} FunnyChess. FunnyChess is created by Somnath Sen with passion & ₹0 initial budget.
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>

@@ -1,0 +1,21 @@
+{
+  "name": "FunnyChess — Learn. Laugh. Play.",
+  "short_name": "FunnyChess",
+  "description": "A fun, free, and beginner-friendly chess platform created by Somnath Sen.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "icons": [
+    {
+      "src": "/images/brand/chess-king.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/brand/chess-queen.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
