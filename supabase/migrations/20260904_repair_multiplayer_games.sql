@@ -1,9 +1,69 @@
 -- ==============================================================================
--- FUNNYCHESS: Authenticated Multiplayer Games Table, Constraints, & Strict RLS
+-- FUNNYCHESS: Authenticated Multiplayer Games Table, Constraints, Profiles & RLS
 -- Migration: 20260904_repair_multiplayer_games.sql
 -- ==============================================================================
 
--- 1. Create public.games table if it does not already exist
+-- 1. Ensure public.profiles exists for user accounts
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT 'Funny Chess Novice',
+  email TEXT,
+  avatar_url TEXT,
+  preferred_language TEXT NOT NULL DEFAULT 'en',
+  preferred_voice_language TEXT NOT NULL DEFAULT 'en',
+  chess_level TEXT NOT NULL DEFAULT 'Beginner I',
+  games_played INTEGER NOT NULL DEFAULT 0,
+  wins INTEGER NOT NULL DEFAULT 0,
+  losses INTEGER NOT NULL DEFAULT 0,
+  draws INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+CREATE POLICY "Public profiles are viewable by everyone."
+  ON public.profiles FOR SELECT
+  USING ( true );
+
+DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
+CREATE POLICY "Users can insert their own profile."
+  ON public.profiles FOR INSERT
+  WITH CHECK ( auth.uid() = id );
+
+DROP POLICY IF EXISTS "Users can update their own profile." ON public.profiles;
+CREATE POLICY "Users can update their own profile."
+  ON public.profiles FOR UPDATE
+  USING ( auth.uid() = id );
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, name, email, avatar_url, preferred_language, preferred_voice_language)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Funny Chess Player'),
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', new.raw_user_meta_data->>'photoURL', new.raw_user_meta_data->>'image', ''),
+    'en',
+    'en'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 2. Create public.games table if it does not already exist
 CREATE TABLE IF NOT EXISTS public.games (
   id TEXT PRIMARY KEY,
   game_type TEXT NOT NULL DEFAULT 'friend' CHECK (game_type IN ('ai', 'friend')),
@@ -31,7 +91,7 @@ CREATE TABLE IF NOT EXISTS public.games (
   )
 );
 
--- 2. Safely ensure UUID column types, constraints, and foreign keys if table already existed
+-- 3. Safely ensure UUID column types, constraints, and foreign keys if table already existed
 DO $$
 BEGIN
   -- Migrate player_white to UUID if needed
@@ -99,18 +159,18 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Ensure status check constraint includes all supported states
+-- 4. Ensure status check constraint includes all supported states
 ALTER TABLE public.games DROP CONSTRAINT IF EXISTS games_status_check;
 ALTER TABLE public.games ADD CONSTRAINT games_status_check 
   CHECK (status IN ('waiting', 'active', 'completed', 'checkmate', 'stalemate', 'draw', 'resigned', 'abandoned'));
 
--- 4. Enable Full Replica Identity for Realtime UPDATE broadcast
+-- 5. Enable Full Replica Identity for Realtime UPDATE broadcast
 ALTER TABLE public.games REPLICA IDENTITY FULL;
 
--- 5. Enable Row Level Security (RLS)
+-- 6. Enable Row Level Security (RLS)
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 
--- 6. Clean up old or insecure policies
+-- 7. Clean up old or insecure policies
 DROP POLICY IF EXISTS "Games are viewable by anyone with the link." ON public.games;
 DROP POLICY IF EXISTS "Games are viewable by players or anyone with the link." ON public.games;
 DROP POLICY IF EXISTS "Anyone can create a game room." ON public.games;
@@ -123,7 +183,7 @@ DROP POLICY IF EXISTS "Authenticated users can create waiting games." ON public.
 DROP POLICY IF EXISTS "Authenticated users can join waiting games." ON public.games;
 DROP POLICY IF EXISTS "Participants can update active or waiting games." ON public.games;
 
--- 7. Define strict authenticated RLS policies
+-- 8. Define strict authenticated RLS policies
 
 -- SELECT: Authenticated users can view waiting games (to join) or games they participate in
 CREATE POLICY "Authenticated users can view joinable or participating games."
@@ -176,7 +236,7 @@ CREATE POLICY "Participants can update active or waiting games."
     AND (auth.uid() = player_white OR auth.uid() = player_black)
   );
 
--- 8. Enable Supabase Realtime publication for public.games
+-- 9. Enable Supabase Realtime publication for public.games
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -187,7 +247,7 @@ BEGIN
   END IF;
 END $$;
 
--- 9. Atomic Join Room RPC function (guarantees race-condition prevention & no self-join)
+-- 10. Atomic Join Room RPC function (guarantees race-condition prevention & no self-join)
 CREATE OR REPLACE FUNCTION public.join_game_room(
   p_game_id TEXT,
   p_player_name TEXT
@@ -195,6 +255,7 @@ CREATE OR REPLACE FUNCTION public.join_game_room(
 RETURNS public.games
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_id UUID;
@@ -250,3 +311,7 @@ BEGIN
   RETURN v_game;
 END;
 $$;
+
+-- Revoke execute from public and grant exclusively to authenticated users
+REVOKE ALL ON FUNCTION public.join_game_room(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.join_game_room(TEXT, TEXT) TO authenticated;

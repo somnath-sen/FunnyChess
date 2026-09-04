@@ -23,21 +23,28 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Enable RLS for profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone."
   ON public.profiles FOR SELECT
   USING ( true );
 
+DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
 CREATE POLICY "Users can insert their own profile."
   ON public.profiles FOR INSERT
   WITH CHECK ( auth.uid() = id );
 
+DROP POLICY IF EXISTS "Users can update their own profile." ON public.profiles;
 CREATE POLICY "Users can update their own profile."
   ON public.profiles FOR UPDATE
   USING ( auth.uid() = id );
 
 -- Auto create profile on auth signup trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   INSERT INTO public.profiles (id, name, email, avatar_url, preferred_language, preferred_voice_language)
   VALUES (
@@ -47,19 +54,20 @@ BEGIN
     COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', new.raw_user_meta_data->>'photoURL', new.raw_user_meta_data->>'image', ''),
     'en',
     'en'
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- 2. Games Table (Supports AI and Multiplayer)
+-- 2. Games Table (Supports AI and Authenticated Multiplayer)
 CREATE TABLE IF NOT EXISTS public.games (
-  id TEXT PRIMARY KEY, -- Friendly alphanumeric ID e.g. "FC-K9M2P4"
+  id TEXT PRIMARY KEY, -- Alphanumeric ID e.g. "FC-K9M2P4"
   game_type TEXT NOT NULL DEFAULT 'friend' CHECK (game_type IN ('ai', 'friend')),
   player_white UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT NULL,
   player_black UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT NULL,
@@ -73,12 +81,34 @@ CREATE TABLE IF NOT EXISTS public.games (
   winner TEXT DEFAULT NULL, -- 'white', 'black', 'draw'
   draw_offer TEXT DEFAULT NULL CHECK (draw_offer IN ('white', 'black', NULL)),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT check_different_players CHECK (
+    player_white IS NULL 
+    OR player_black IS NULL 
+    OR player_white != player_black
+  ),
+  CONSTRAINT check_active_players CHECK (
+    status != 'active' 
+    OR (player_white IS NOT NULL AND player_black IS NOT NULL AND player_white != player_black)
+  )
 );
 
 ALTER TABLE public.games REPLICA IDENTITY FULL;
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Games are viewable by anyone with the link." ON public.games;
+DROP POLICY IF EXISTS "Games are viewable by players or anyone with the link." ON public.games;
+DROP POLICY IF EXISTS "Anyone can create a game room." ON public.games;
+DROP POLICY IF EXISTS "Authenticated users can create games." ON public.games;
+DROP POLICY IF EXISTS "Players can update games they are participating in." ON public.games;
+DROP POLICY IF EXISTS "Players can update active or waiting games." ON public.games;
+DROP POLICY IF EXISTS "Authenticated users can view games." ON public.games;
+DROP POLICY IF EXISTS "Authenticated users can view joinable or participating games." ON public.games;
+DROP POLICY IF EXISTS "Authenticated users can create waiting games." ON public.games;
+DROP POLICY IF EXISTS "Authenticated users can join waiting games." ON public.games;
+DROP POLICY IF EXISTS "Participants can update active or waiting games." ON public.games;
+
+-- SELECT: Authenticated users can view waiting games (to join) or games they participate in
 CREATE POLICY "Authenticated users can view joinable or participating games."
   ON public.games FOR SELECT
   TO authenticated
@@ -88,6 +118,7 @@ CREATE POLICY "Authenticated users can view joinable or participating games."
     OR auth.uid() = player_black
   );
 
+-- INSERT: Authenticated users can create waiting games with themselves in one player slot
 CREATE POLICY "Authenticated users can create waiting games."
   ON public.games FOR INSERT
   TO authenticated
@@ -100,6 +131,7 @@ CREATE POLICY "Authenticated users can create waiting games."
     )
   );
 
+-- UPDATE (Join): An authenticated user can join a waiting game that has an open slot
 CREATE POLICY "Authenticated users can join waiting games."
   ON public.games FOR UPDATE
   TO authenticated
@@ -111,8 +143,10 @@ CREATE POLICY "Authenticated users can join waiting games."
   WITH CHECK (
     status IN ('waiting', 'active')
     AND (auth.uid() = player_white OR auth.uid() = player_black)
+    AND player_white != player_black
   );
 
+-- UPDATE (Moves / Actions): Only the actual participants can update active or waiting games
 CREATE POLICY "Participants can update active or waiting games."
   ON public.games FOR UPDATE
   TO authenticated
@@ -136,6 +170,74 @@ BEGIN
   END IF;
 END $$;
 
+-- Atomic Join Room RPC function
+CREATE OR REPLACE FUNCTION public.join_game_room(
+  p_game_id TEXT,
+  p_player_name TEXT
+)
+RETURNS public.games
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_game public.games;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required to join game';
+  END IF;
+
+  -- Lock row for update to prevent race conditions
+  SELECT * INTO v_game
+  FROM public.games
+  WHERE id = p_game_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Game not found';
+  END IF;
+
+  IF v_game.status != 'waiting' THEN
+    RAISE EXCEPTION 'Game is not in waiting state';
+  END IF;
+
+  -- Prevent joining own game
+  IF v_game.player_white = v_user_id OR v_game.player_black = v_user_id THEN
+    RAISE EXCEPTION 'You cannot join your own game';
+  END IF;
+
+  -- Check open slot
+  IF v_game.player_white IS NULL AND v_game.player_black IS NOT NULL THEN
+    UPDATE public.games
+    SET 
+      player_white = v_user_id,
+      player_white_name = COALESCE(NULLIF(p_player_name, ''), 'Player White'),
+      status = 'active',
+      updated_at = timezone('utc'::text, now())
+    WHERE id = p_game_id
+    RETURNING * INTO v_game;
+  ELSIF v_game.player_black IS NULL AND v_game.player_white IS NOT NULL THEN
+    UPDATE public.games
+    SET 
+      player_black = v_user_id,
+      player_black_name = COALESCE(NULLIF(p_player_name, ''), 'Player Black'),
+      status = 'active',
+      updated_at = timezone('utc'::text, now())
+    WHERE id = p_game_id
+    RETURNING * INTO v_game;
+  ELSE
+    RAISE EXCEPTION 'Game room is full';
+  END IF;
+
+  RETURN v_game;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.join_game_room(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.join_game_room(TEXT, TEXT) TO authenticated;
+
 -- 3. Learning Progress Table
 CREATE TABLE IF NOT EXISTS public.learning_progress (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -149,10 +251,12 @@ CREATE TABLE IF NOT EXISTS public.learning_progress (
 
 ALTER TABLE public.learning_progress ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own learning progress." ON public.learning_progress;
 CREATE POLICY "Users can view their own learning progress."
   ON public.learning_progress FOR SELECT
   USING ( auth.uid() = user_id );
 
+DROP POLICY IF EXISTS "Users can insert/update their own learning progress." ON public.learning_progress;
 CREATE POLICY "Users can insert/update their own learning progress."
   ON public.learning_progress FOR ALL
   USING ( auth.uid() = user_id );
@@ -168,10 +272,12 @@ CREATE TABLE IF NOT EXISTS public.achievements (
 
 ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Achievements are viewable by anyone." ON public.achievements;
 CREATE POLICY "Achievements are viewable by anyone."
   ON public.achievements FOR SELECT
   USING ( true );
 
+DROP POLICY IF EXISTS "Users can unlock their own achievements." ON public.achievements;
 CREATE POLICY "Users can unlock their own achievements."
   ON public.achievements FOR INSERT
   WITH CHECK ( auth.uid() = user_id );
