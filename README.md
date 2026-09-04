@@ -59,7 +59,7 @@ FunnyChess is a modern, interactive, and humorous chess learning & playing web p
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/your-username/funnychess.git
+git clone https://github.com/somnath-sen/FunnyChess.git
 cd funnychess
 npm install
 ```
