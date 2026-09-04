@@ -300,7 +300,7 @@ export const FounderSection: React.FC = () => {
                   lineHeight: 1.15,
                 }}
               >
-                Hi, I'm{' '}
+                Hi, I&apos;m{' '}
                 <span
                   style={{
                     background: 'linear-gradient(135deg, #ffffff 30%, #fbbf24 70%, #f59e0b 100%)',

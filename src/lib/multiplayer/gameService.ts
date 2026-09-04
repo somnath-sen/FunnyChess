@@ -1,12 +1,13 @@
 import { Chess } from 'chess.js';
 import { getSupabase } from '@/lib/supabase/client';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface MultiplayerGame {
   id: string;
   game_type: 'friend';
   status: 'waiting' | 'active' | 'completed' | 'abandoned';
-  player_white: string;
-  player_white_name: string;
+  player_white: string | null;
+  player_white_name: string | null;
   player_black: string | null;
   player_black_name: string | null;
   current_fen: string;
@@ -21,6 +22,33 @@ export interface MultiplayerGame {
 
 export type PlayerRole = 'white' | 'black' | 'spectator';
 
+export type GameFetchError =
+  | 'not_authenticated'
+  | 'not_found'
+  | 'expired'
+  | 'game_full'
+  | 'db_error'
+  | 'permission_error'
+  | 'network_error'
+  | 'invalid_id';
+
+export type GameFetchResult =
+  | { success: true; game: MultiplayerGame }
+  | { success: false; error: GameFetchError; message?: string };
+
+// Helper to retrieve the verified Supabase Auth user
+export async function getAuthenticatedUser() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
 // Generate difficult-to-guess, non-sequential room code (e.g. "FC-K9M2P4")
 export function generateGameCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -31,28 +59,75 @@ export function generateGameCode(): string {
   return code;
 }
 
-const LOCAL_STORAGE_PREFIX = 'funnychess_game_';
+// Normalize room code from user input or URL
+export function normalizeGameCode(rawCode: string): string {
+  if (!rawCode) return '';
+  let cleaned = rawCode.trim().toUpperCase();
 
-class GameService {
-  // Store local games in localStorage for resilient zero-config multi-tab testing
-  private saveLocalGame(game: MultiplayerGame) {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(LOCAL_STORAGE_PREFIX + game.id, JSON.stringify(game));
-    } catch {}
+  // Strip URL prefix if user pasted a full URL
+  if (cleaned.includes('/GAME/')) {
+    cleaned = cleaned.split('/GAME/')[1];
   }
 
-  private getLocalGame(id: string): MultiplayerGame | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      const data = localStorage.getItem(LOCAL_STORAGE_PREFIX + id);
-      return data ? JSON.parse(data) : null;
-    } catch {
-      return null;
+  // Strip query parameters and hashes
+  cleaned = cleaned.split('?')[0].split('#')[0];
+
+  // Remove any remaining invalid characters
+  cleaned = cleaned.replace(/[^A-Z0-9-]/g, '');
+
+  // If user entered 6 characters without FC- prefix, prepend FC-
+  if (!cleaned.startsWith('FC-') && cleaned.length === 6) {
+    cleaned = `FC-${cleaned}`;
+  }
+
+  return cleaned;
+}
+
+// Convert database row into typed MultiplayerGame
+export function formatGameRow(data: any): MultiplayerGame {
+  let currentTurn: 'w' | 'b' = 'w';
+  try {
+    currentTurn = new Chess(data.current_fen).turn();
+  } catch {
+    currentTurn = 'w';
+  }
+
+  return {
+    id: data.id,
+    game_type: 'friend',
+    status: data.status || 'waiting',
+    player_white: data.player_white || null,
+    player_white_name: data.player_white_name || (data.player_white ? 'Player White' : null),
+    player_black: data.player_black || null,
+    player_black_name: data.player_black_name || (data.player_black ? 'Player Black' : null),
+    current_fen: data.current_fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    move_history: Array.isArray(data.move_history) ? data.move_history : [],
+    current_turn: currentTurn,
+    last_move: data.last_move || null,
+    winner: data.winner || null,
+    draw_offer: data.draw_offer || null,
+    created_at: data.created_at || new Date().toISOString(),
+    updated_at: data.updated_at || new Date().toISOString(),
+  };
+}
+
+// Check if a waiting room has expired (> 24 hours of inactivity)
+export function isGameExpired(game: MultiplayerGame): boolean {
+  if (game.status === 'waiting' && game.created_at) {
+    const createdTime = new Date(game.created_at).getTime();
+    if (!isNaN(createdTime)) {
+      const hoursDiff = (Date.now() - createdTime) / (1000 * 60 * 60);
+      if (hoursDiff > 24) return true;
     }
   }
+  return false;
+}
 
-  // Broadcast event via BroadcastChannel (local tabs) and Supabase Realtime
+class GameService {
+  // Store active realtime channel references to avoid dropped messages
+  private activeChannels = new Map<string, RealtimeChannel>();
+
+  // Broadcast event via Supabase Realtime channel and local BroadcastChannel
   private broadcastEvent(gameId: string, event: string, payload: any) {
     // 1. Local BroadcastChannel for instant local testing between tabs
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -63,24 +138,36 @@ class GameService {
       } catch {}
     }
 
-    // 2. Supabase Realtime Channel for global internet multiplayer
-    const supabase = getSupabase();
-    if (supabase) {
-      const channel = supabase.channel('game:' + gameId);
-      channel.send({
-        type: 'broadcast',
-        event,
-        payload,
-      });
+    // 2. Supabase Realtime Channel
+    const activeChannel = this.activeChannels.get(gameId);
+    if (activeChannel) {
+      try {
+        activeChannel.send({
+          type: 'broadcast',
+          event,
+          payload,
+        });
+      } catch (err) {
+        console.warn('[GameService] Realtime broadcast error:', err);
+      }
     }
   }
 
-  // Create a new multiplayer game
+  // Create a new multiplayer game strictly authenticated with Supabase
   public async createGame(params: {
-    creatorName: string;
-    creatorId: string;
+    creatorName?: string;
     preferredColor?: 'white' | 'black' | 'random';
   }): Promise<MultiplayerGame> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please check your environment configuration.');
+    }
+
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      throw new Error('Authentication required. You must be signed in with Google to create a game room.');
+    }
+
     const id = generateGameCode();
     const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -91,18 +178,23 @@ class GameService {
       isCreatorWhite = Math.random() > 0.5;
     }
 
+    const resolvedName =
+      params.creatorName?.trim() ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      'Player';
+
     const now = new Date().toISOString();
-    const newGame: MultiplayerGame = {
+    const rowToInsert = {
       id,
       game_type: 'friend',
       status: 'waiting',
-      player_white: isCreatorWhite ? params.creatorId : '',
-      player_white_name: isCreatorWhite ? params.creatorName : 'Waiting for player...',
-      player_black: !isCreatorWhite ? params.creatorId : null,
-      player_black_name: !isCreatorWhite ? params.creatorName : null,
+      player_white: isCreatorWhite ? user.id : null,
+      player_white_name: isCreatorWhite ? resolvedName : null,
+      player_black: !isCreatorWhite ? user.id : null,
+      player_black_name: !isCreatorWhite ? resolvedName : null,
       current_fen: initialFen,
       move_history: [],
-      current_turn: 'w',
       last_move: null,
       winner: null,
       draw_offer: null,
@@ -110,131 +202,228 @@ class GameService {
       updated_at: now,
     };
 
-    // Save locally
-    this.saveLocalGame(newGame);
+    const { data, error } = await supabase
+      .from('games')
+      .insert(rowToInsert)
+      .select()
+      .single();
 
-    // Save to Supabase if configured
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        await supabase.from('games').insert({
-          id: newGame.id,
-          game_type: 'friend',
-          player_white_name: newGame.player_white_name,
-          player_black_name: newGame.player_black_name,
-          status: newGame.status,
-          current_fen: newGame.current_fen,
-          move_history: newGame.move_history,
-          created_at: newGame.created_at,
-          updated_at: newGame.updated_at,
-        });
-      } catch {}
+    if (error) {
+      console.error('[GameService] Error creating game in Supabase:', error);
+      throw new Error(`Unable to create the game room: ${error.message}`);
     }
 
-    return newGame;
+    if (!data) {
+      throw new Error('Unable to create the game room. Please try again.');
+    }
+
+    return formatGameRow(data);
   }
 
-  // Fetch game by ID
-  public async getGame(id: string): Promise<MultiplayerGame | null> {
-    // Check Supabase first
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('games').select('*').eq('id', id).single();
-        if (data && !error) {
-          const game: MultiplayerGame = {
-            id: data.id,
-            game_type: 'friend',
-            status: data.status || 'waiting',
-            player_white: data.player_white || 'player_white',
-            player_white_name: data.player_white_name || 'Player White',
-            player_black: data.player_black || null,
-            player_black_name: data.player_black_name || null,
-            current_fen: data.current_fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-            move_history: data.move_history || [],
-            current_turn: new Chess(data.current_fen).turn(),
-            last_move: null,
-            winner: data.winner || null,
-            draw_offer: null,
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-          };
-          this.saveLocalGame(game);
-          return game;
-        }
-      } catch {}
+  // Detailed fetch with specific error classification
+  public async getGameDetails(rawId: string): Promise<GameFetchResult> {
+    const id = normalizeGameCode(rawId);
+    if (!id) {
+      return { success: false, error: 'invalid_id', message: 'Room code is empty or invalid' };
     }
 
-    // Check Local Storage
-    return this.getLocalGame(id);
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { success: false, error: 'db_error', message: 'Supabase client is not available' };
+    }
+
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return { success: false, error: 'not_authenticated', message: 'Sign in to join this game' };
+    }
+
+    try {
+      // First try the normalized ID
+      let { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      // If not found and ID was entered without FC-, try with FC-
+      if (!data && !error && !id.startsWith('FC-') && id.length === 6) {
+        const res = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', `FC-${id}`)
+          .maybeSingle();
+        data = res.data;
+        error = res.error;
+      }
+
+      if (error) {
+        console.error('[GameService] Supabase error fetching game:', error);
+        if (error.code === 'PGRST205') {
+          return {
+            success: false,
+            error: 'db_error',
+            message: 'Multiplayer database table not found. Please run the Supabase migration script.',
+          };
+        }
+        if (error.code === '42501') {
+          return {
+            success: false,
+            error: 'permission_error',
+            message: 'You do not have permission to view this game room.',
+          };
+        }
+        return { success: false, error: 'db_error', message: error.message };
+      }
+
+      if (data) {
+        const game = formatGameRow(data);
+        if (isGameExpired(game)) {
+          return {
+            success: false,
+            error: 'expired',
+            message: 'This room code has expired after 24 hours of inactivity.',
+          };
+        }
+        // If room is full and current user is not a participant
+        if (
+          game.player_white &&
+          game.player_black &&
+          game.player_white !== user.id &&
+          game.player_black !== user.id
+        ) {
+          return {
+            success: false,
+            error: 'game_full',
+            message: 'This match is already in progress between two players.',
+          };
+        }
+        return { success: true, game };
+      }
+
+      // Genuinely not found in Supabase
+      return { success: false, error: 'not_found', message: 'Room does not exist' };
+    } catch (err: any) {
+      console.error('[GameService] Network/system exception fetching game:', err);
+      return { success: false, error: 'network_error', message: err?.message || 'Connection failed' };
+    }
+  }
+
+  // Simplified fetch returning game or null
+  public async getGame(id: string): Promise<MultiplayerGame | null> {
+    const res = await this.getGameDetails(id);
+    return res.success ? res.game : null;
   }
 
   // Join existing game as second player
   public async joinGame(
     id: string,
-    playerName: string,
-    playerId: string
-  ): Promise<{ game: MultiplayerGame; role: PlayerRole } | { error: string }> {
-    const game = await this.getGame(id);
-    if (!game) {
-      return { error: 'game_not_found' };
+    playerName?: string
+  ): Promise<{ game: MultiplayerGame; role: PlayerRole } | { error: string; message?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { error: 'db_error', message: 'Database connection unavailable' };
     }
 
-    // Check if user is already one of the players
-    if (game.player_white === playerId) {
-      return { game, role: 'white' };
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return { error: 'not_authenticated', message: 'You must be signed in to join this game.' };
     }
-    if (game.player_black === playerId) {
-      return { game, role: 'black' };
+
+    const details = await this.getGameDetails(id);
+    if (!details.success) {
+      return { error: details.error, message: details.message };
+    }
+    const game = details.game;
+
+    // Strictly prevent a user from joining their own game room as the opponent
+    if (game.player_white === user.id || game.player_black === user.id) {
+      return {
+        error: 'already_joined',
+        message: "You can't join your own game! Share the invite link with a friend to play.",
+      };
     }
 
     // Check if room is already full
     if (game.player_white && game.player_black) {
-      return { error: 'game_full' };
+      return { error: 'game_full', message: 'This match already has two players.' };
     }
 
-    const updatedGame: MultiplayerGame = { ...game };
+    // Check that room is still waiting
+    if (game.status !== 'waiting') {
+      return { error: 'not_waiting', message: 'This game is no longer waiting for an opponent.' };
+    }
+
+    const resolvedName =
+      playerName?.trim() ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      'Challenger';
+
+    // 1. Try atomic PostgreSQL RPC function if available (FOR UPDATE locking)
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('join_game_room', {
+        p_game_id: game.id,
+        p_player_name: resolvedName,
+      });
+
+      if (!rpcError && rpcData) {
+        const persisted = formatGameRow(rpcData);
+        const assignedRole: PlayerRole = persisted.player_white === user.id ? 'white' : 'black';
+        this.broadcastEvent(game.id, 'player_joined', { game: persisted });
+        return { game: persisted, role: assignedRole };
+      }
+    } catch {
+      // Fall through to atomic conditional update query
+    }
+
+    // 2. Safe atomic conditional update query
+    const now = new Date().toISOString();
     let assignedRole: PlayerRole = 'black';
+    let updateQuery;
 
     if (!game.player_white) {
-      updatedGame.player_white = playerId;
-      updatedGame.player_white_name = playerName;
       assignedRole = 'white';
+      updateQuery = supabase
+        .from('games')
+        .update({
+          player_white: user.id,
+          player_white_name: resolvedName,
+          status: 'active',
+          updated_at: now,
+        })
+        .eq('id', game.id)
+        .eq('status', 'waiting')
+        .is('player_white', null)
+        .neq('player_black', user.id);
     } else {
-      updatedGame.player_black = playerId;
-      updatedGame.player_black_name = playerName;
       assignedRole = 'black';
+      updateQuery = supabase
+        .from('games')
+        .update({
+          player_black: user.id,
+          player_black_name: resolvedName,
+          status: 'active',
+          updated_at: now,
+        })
+        .eq('id', game.id)
+        .eq('status', 'waiting')
+        .is('player_black', null)
+        .neq('player_white', user.id);
     }
 
-    // Both seats filled -> Game is now active!
-    if (updatedGame.player_white && updatedGame.player_black) {
-      updatedGame.status = 'active';
+    const { data, error } = await updateQuery.select().single();
+
+    if (error || !data) {
+      console.error('[GameService] Failed to persist join in Supabase:', error);
+      return {
+        error: 'game_full',
+        message: 'Could not join room. It may already be full or no longer waiting for an opponent.',
+      };
     }
 
-    updatedGame.updated_at = new Date().toISOString();
-
-    // Persist changes
-    this.saveLocalGame(updatedGame);
-
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        await supabase
-          .from('games')
-          .update({
-            player_white_name: updatedGame.player_white_name,
-            player_black_name: updatedGame.player_black_name,
-            status: updatedGame.status,
-            updated_at: updatedGame.updated_at,
-          })
-          .eq('id', id);
-      } catch {}
-    }
-
-    // Broadcast join event to creator
-    this.broadcastEvent(id, 'player_joined', { game: updatedGame });
-
-    return { game: updatedGame, role: assignedRole };
+    const persisted = formatGameRow(data);
+    this.broadcastEvent(game.id, 'player_joined', { game: persisted });
+    return { game: persisted, role: assignedRole };
   }
 
   // Make legal move
@@ -245,6 +434,12 @@ class GameService {
     promotion: string = 'q',
     playerRole: PlayerRole
   ): Promise<{ game: MultiplayerGame; move: any } | { error: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { error: 'Database connection unavailable' };
+
+    const user = await getAuthenticatedUser();
+    if (!user) return { error: 'Authentication required' };
+
     const game = await this.getGame(id);
     if (!game) return { error: 'Game not found' };
 
@@ -252,9 +447,18 @@ class GameService {
       return { error: 'Game is not active' };
     }
 
+    // Verify authorized role matches authenticated user ID
+    if (playerRole === 'white' && game.player_white !== user.id) {
+      return { error: 'Unauthorized: You are not Player White' };
+    }
+    if (playerRole === 'black' && game.player_black !== user.id) {
+      return { error: 'Unauthorized: You are not Player Black' };
+    }
+
     // Validate turn
-    const isPlayerTurn = (playerRole === 'white' && game.current_turn === 'w') ||
-                         (playerRole === 'black' && game.current_turn === 'b');
+    const isPlayerTurn =
+      (playerRole === 'white' && game.current_turn === 'w') ||
+      (playerRole === 'black' && game.current_turn === 'b');
     if (!isPlayerTurn) {
       return { error: 'Not your turn' };
     }
@@ -289,35 +493,54 @@ class GameService {
       updated_at: new Date().toISOString(),
     };
 
-    this.saveLocalGame(updatedGame);
+    const { data, error } = await supabase
+      .from('games')
+      .update({
+        current_fen: updatedGame.current_fen,
+        move_history: updatedGame.move_history,
+        last_move: updatedGame.last_move,
+        status: updatedGame.status,
+        winner: updatedGame.winner,
+        draw_offer: null,
+        updated_at: updatedGame.updated_at,
+      })
+      .eq('id', game.id)
+      .select()
+      .single();
 
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        await supabase
-          .from('games')
-          .update({
-            current_fen: updatedGame.current_fen,
-            move_history: updatedGame.move_history,
-            status: updatedGame.status,
-            winner: updatedGame.winner,
-            updated_at: updatedGame.updated_at,
-          })
-          .eq('id', id);
-      } catch {}
+    if (error) {
+      console.error('[GameService] Failed to persist move to Supabase:', error);
+      return { error: error.message };
     }
 
-    // Broadcast move to opponent
-    this.broadcastEvent(id, 'chess_move', { game: updatedGame, move });
+    if (data) {
+      const persisted = formatGameRow(data);
+      this.broadcastEvent(game.id, 'chess_move', { game: persisted, move });
+      return { game: persisted, move };
+    }
 
-    return { game: updatedGame, move };
+    return { error: 'Failed to persist move' };
   }
 
   // Resign match
   public async resign(id: string, playerRole: PlayerRole): Promise<MultiplayerGame> {
-    const game = (await this.getGame(id)) || this.getLocalGame(id)!;
-    const winner = playerRole === 'white' ? 'black' : 'white';
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Database connection unavailable');
 
+    const user = await getAuthenticatedUser();
+    if (!user) throw new Error('Authentication required');
+
+    const game = await this.getGame(id);
+    if (!game) throw new Error('Game not found');
+
+    if (playerRole === 'white' && game.player_white !== user.id) {
+      throw new Error('Unauthorized');
+    }
+    if (playerRole === 'black' && game.player_black !== user.id) {
+      throw new Error('Unauthorized');
+    }
+
+    const winner = playerRole === 'white' ? 'black' : 'white';
     const updated: MultiplayerGame = {
       ...game,
       status: 'completed',
@@ -325,26 +548,85 @@ class GameService {
       updated_at: new Date().toISOString(),
     };
 
-    this.saveLocalGame(updated);
-    this.broadcastEvent(id, 'game_resigned', { game: updated, resignedBy: playerRole });
-    return updated;
+    const { data, error } = await supabase
+      .from('games')
+      .update({
+        status: updated.status,
+        winner: updated.winner,
+        updated_at: updated.updated_at,
+      })
+      .eq('id', game.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[GameService] Failed to persist resign to Supabase:', error);
+    }
+
+    const result = data ? formatGameRow(data) : updated;
+    this.broadcastEvent(game.id, 'game_resigned', { game: result, resignedBy: playerRole });
+    return result;
   }
 
   // Offer draw
   public async offerDraw(id: string, playerRole: PlayerRole): Promise<MultiplayerGame> {
-    const game = (await this.getGame(id)) || this.getLocalGame(id)!;
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Database connection unavailable');
+
+    const user = await getAuthenticatedUser();
+    if (!user) throw new Error('Authentication required');
+
+    const game = await this.getGame(id);
+    if (!game) throw new Error('Game not found');
+
+    if (playerRole === 'white' && game.player_white !== user.id) {
+      throw new Error('Unauthorized');
+    }
+    if (playerRole === 'black' && game.player_black !== user.id) {
+      throw new Error('Unauthorized');
+    }
+
+    const drawOffer = playerRole === 'white' ? 'white' : 'black';
     const updated: MultiplayerGame = {
       ...game,
-      draw_offer: playerRole === 'white' ? 'white' : 'black',
+      draw_offer: drawOffer,
+      updated_at: new Date().toISOString(),
     };
-    this.saveLocalGame(updated);
-    this.broadcastEvent(id, 'draw_offered', { game: updated, offeredBy: playerRole });
-    return updated;
+
+    const { data, error } = await supabase
+      .from('games')
+      .update({
+        draw_offer: drawOffer,
+        updated_at: updated.updated_at,
+      })
+      .eq('id', game.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[GameService] Failed to persist draw offer to Supabase:', error);
+    }
+
+    const result = data ? formatGameRow(data) : updated;
+    this.broadcastEvent(game.id, 'draw_offered', { game: result, offeredBy: playerRole });
+    return result;
   }
 
   // Accept draw
   public async acceptDraw(id: string): Promise<MultiplayerGame> {
-    const game = (await this.getGame(id)) || this.getLocalGame(id)!;
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Database connection unavailable');
+
+    const user = await getAuthenticatedUser();
+    if (!user) throw new Error('Authentication required');
+
+    const game = await this.getGame(id);
+    if (!game) throw new Error('Game not found');
+
+    if (game.player_white !== user.id && game.player_black !== user.id) {
+      throw new Error('Unauthorized');
+    }
+
     const updated: MultiplayerGame = {
       ...game,
       status: 'completed',
@@ -352,22 +634,40 @@ class GameService {
       draw_offer: null,
       updated_at: new Date().toISOString(),
     };
-    this.saveLocalGame(updated);
-    this.broadcastEvent(id, 'draw_accepted', { game: updated });
-    return updated;
+
+    const { data, error } = await supabase
+      .from('games')
+      .update({
+        status: updated.status,
+        winner: updated.winner,
+        draw_offer: null,
+        updated_at: updated.updated_at,
+      })
+      .eq('id', game.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[GameService] Failed to persist accept draw to Supabase:', error);
+    }
+
+    const result = data ? formatGameRow(data) : updated;
+    this.broadcastEvent(game.id, 'draw_accepted', { game: result });
+    return result;
   }
 
-  // Subscribe to real-time events on both Supabase and Local BroadcastChannel
+  // Subscribe to real-time events on Supabase postgres_changes + broadcast + BroadcastChannel
   public subscribeToGame(
     gameId: string,
     onGameUpdate: (game: MultiplayerGame, event?: string, meta?: any) => void
   ): () => void {
+    const normalizedId = normalizeGameCode(gameId);
     let cleanups: (() => void)[] = [];
 
-    // 1. Local BroadcastChannel Listener
+    // 1. Local BroadcastChannel Listener (same device tabs)
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
-        const bc = new BroadcastChannel('funnychess_realtime_' + gameId);
+        const bc = new BroadcastChannel('funnychess_realtime_' + normalizedId);
         bc.onmessage = (e) => {
           if (e.data && e.data.payload && e.data.payload.game) {
             onGameUpdate(e.data.payload.game, e.data.event, e.data.payload);
@@ -377,37 +677,58 @@ class GameService {
       } catch {}
     }
 
-    // 2. Storage event listener (in case BroadcastChannel isn't cross-window in some configs)
-    if (typeof window !== 'undefined') {
-      const storageHandler = (e: StorageEvent) => {
-        if (e.key === LOCAL_STORAGE_PREFIX + gameId && e.newValue) {
-          try {
-            const updatedGame = JSON.parse(e.newValue);
-            onGameUpdate(updatedGame, 'storage_sync');
-          } catch {}
-        }
-      };
-      window.addEventListener('storage', storageHandler);
-      cleanups.push(() => window.removeEventListener('storage', storageHandler));
-    }
-
-    // 3. Supabase Realtime Channel Listener
+    // 2. Supabase Realtime Channel (Postgres Changes + Broadcast)
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const channel = supabase
-          .channel('game:' + gameId)
-          .on('broadcast', { event: '*' }, (payload: any) => {
-            if (payload && payload.payload && payload.payload.game) {
-              onGameUpdate(payload.payload.game, payload.event, payload.payload);
+        const channelName = `game_room_${normalizedId}`;
+        const channel = supabase.channel(channelName);
+
+        // A. Listen for authoritative Postgres database updates
+        channel.on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'games',
+            filter: `id=eq.${normalizedId}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              const updatedGame = formatGameRow(payload.new);
+              onGameUpdate(updatedGame, 'postgres_changes', payload);
             }
-          })
-          .subscribe();
+          }
+        );
+
+        // B. Listen for instant broadcast messages (moves, sounds, comments)
+        channel.on('broadcast', { event: '*' }, (payload: any) => {
+          if (payload && payload.payload && payload.payload.game) {
+            onGameUpdate(payload.payload.game, payload.event, payload.payload);
+          }
+        });
+
+        // C. Track status and auto-resync upon reconnection
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Re-fetch authoritative state when connection is established
+            this.getGame(normalizedId).then((freshGame) => {
+              if (freshGame) {
+                onGameUpdate(freshGame, 'reconnect_sync');
+              }
+            });
+          }
+        });
+
+        this.activeChannels.set(normalizedId, channel);
 
         cleanups.push(() => {
+          this.activeChannels.delete(normalizedId);
           supabase.removeChannel(channel);
         });
-      } catch {}
+      } catch (err) {
+        console.error('[GameService] Realtime channel setup error:', err);
+      }
     }
 
     return () => {

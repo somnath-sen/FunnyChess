@@ -41,13 +41,36 @@ export function getSiteUrl(): string {
 }
 
 /**
- * Resolves the OAuth callback redirect URL.
+ * Safely sanitizes an internal redirect path, preventing open redirect vulnerabilities.
+ * Only allows relative paths on the same origin (starting with / but not // or /\).
+ */
+export function sanitizeRedirectPath(path: string | null | undefined, fallback: string = '/play/friend'): string {
+  if (!path || typeof path !== 'string') return fallback;
+  const trimmed = path.trim();
+  // Must start with single slash, not double slash (//evil.com) or protocol-relative (/\evil.com)
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
+    return fallback;
+  }
+  // Disallow colon before a slash or anywhere in the path (blocks javascript:, http:, https:, data:)
+  if (trimmed.includes(':') || trimmed.includes('\\')) {
+    return fallback;
+  }
+  return trimmed;
+}
+
+/**
+ * Resolves the OAuth callback redirect URL with an optional safe internal return path.
  *
  * Guaranteed output:
  * - Production: https://funny-chess-sigma.vercel.app/auth/callback
  * - Localhost:   http://localhost:3000/auth/callback
  */
-export function getAuthCallbackUrl(): string {
+export function getAuthCallbackUrl(returnUrl?: string): string {
   const base = getSiteUrl();
-  return `${base.replace(/\/$/, '')}/auth/callback`;
+  let callbackUrl = `${base.replace(/\/$/, '')}/auth/callback`;
+  if (returnUrl) {
+    const safePath = sanitizeRedirectPath(returnUrl);
+    callbackUrl += `?next=${encodeURIComponent(safePath)}`;
+  }
+  return callbackUrl;
 }

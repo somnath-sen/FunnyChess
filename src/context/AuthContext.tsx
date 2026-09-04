@@ -10,7 +10,7 @@ import {
 } from '@/lib/gamification/gamificationService';
 import { sounds } from '@/lib/audio/soundEffects';
 import confetti from 'canvas-confetti';
-import { getAuthCallbackUrl } from '@/lib/url';
+import { getAuthCallbackUrl, sanitizeRedirectPath } from '@/lib/url';
 
 export interface GameModeStats {
   played: number;
@@ -49,10 +49,11 @@ export interface AchievementNotification {
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  isAuthenticated: boolean;
   isConfigured: boolean;
   notification: AchievementNotification | null;
   dismissNotification: () => void;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (returnUrl?: string) => Promise<void>;
   signInAsGuest: () => void;
   signOut: () => Promise<void>;
   addXP: (amount: number, reason?: string) => void;
@@ -248,16 +249,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user) {
-          syncSessionUser(session.user);
+          await syncSessionUser(session.user);
         }
         setLoading(false);
       });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
-          syncSessionUser(session.user);
+          await syncSessionUser(session.user);
+        } else {
+          // Reset to default guest on sign out
+          setUser(DEFAULT_GUEST);
+          localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
         }
       });
 
@@ -326,11 +331,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Sign in with Google (Environment-aware OAuth redirect)
-  const signInWithGoogle = async () => {
+  // Sign in with Google (Environment-aware OAuth redirect with safe return URL)
+  const signInWithGoogle = async (returnUrl?: string) => {
     const supabase = getSupabase();
     if (!supabase) return;
-    const redirectUrl = getAuthCallbackUrl();
+    const safePath = returnUrl ? sanitizeRedirectPath(returnUrl) : '/play/friend';
+    if (typeof document !== 'undefined') {
+      document.cookie = `funnychess_auth_return=${encodeURIComponent(safePath)}; path=/; max-age=600; SameSite=Lax`;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('funnychess_auth_return', safePath);
+      } catch {}
+    }
+    const redirectUrl = getAuthCallbackUrl(safePath);
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -509,6 +523,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         loading,
+        isAuthenticated: Boolean(user && !user.isGuest),
         isConfigured: isSupabaseConfigured,
         notification,
         dismissNotification,

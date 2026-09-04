@@ -140,5 +140,25 @@
     "tagline": "Chess is not hard. You just haven’t learned it the fun way yet.",
     "quote": "“I sacrificed my Queen for educational purposes.”",
     "madeWith": "Made with ❤️ Somnath Sen"
+  },
+  "multiplayerAuth": {
+    "signInToPlay": "Sign in to play with a friend",
+    "signInSubtitle": "Create private chess rooms, invite your friends, and keep your games synchronized across devices.",
+    "signInToJoin": "Sign in to join this game",
+    "authRequired": "Authentication required",
+    "pleaseSignInGoogle": "Please sign in with Google",
+    "signInWithGoogle": "Sign in with Google",
+    "authRequiredNotice": "Your account is required for secure multiplayer.",
+    "unableToCreate": "Unable to create the game room. Please try again.",
+    "unableToConnect": "Unable to connect to the game server. Please try again.",
+    "roomNotFound": "Game Not Found",
+    "roomNotFoundDesc": "This room code doesn't exist or has expired. Check your invite link or create a new room!",
+    "roomExpired": "Room Expired",
+    "roomExpiredDesc": "This game room has expired due to 24 hours of inactivity. Please create a fresh game room!",
+    "roomFull": "Room is Full",
+    "roomFullDesc": "This match is already in progress between two players.",
+    "invitedDuel": "invited you to a live chess duel on FunnyChess!",
+    "acceptChallenge": "Accept Challenge & Play",
+    "soloAlt": "Want to play without signing in? Play with Funny AI →"
   }
 }

@@ -13,6 +13,8 @@ import { analyzePosition, HackAnalysis } from '@/lib/chess/hackEngine';
 import { sounds } from '@/lib/audio/soundEffects';
 import { useTranslation } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { UserAvatar } from '@/components/UserAvatar';
+import { getSiteUrl } from '@/lib/url';
 import confetti from 'canvas-confetti';
 import { 
   Users, 
@@ -28,9 +30,12 @@ import {
   ArrowLeft,
   Sparkles,
   AlertCircle,
+  ShieldCheck,
   Wifi,
   WifiOff,
-  Share2
+  Share2,
+  MessageCircle,
+  Loader2
 } from 'lucide-react';
 
 export default function MultiplayerGamePage() {
@@ -38,20 +43,23 @@ export default function MultiplayerGamePage() {
   const router = useRouter();
   const gameId = (params?.id as string)?.toUpperCase();
   const { language, t } = useTranslation();
-  const { user } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, signInWithGoogle } = useAuth();
   const speech = useSpeech(language as any);
 
   // Identity state
-  const [playerId, setPlayerId] = useState<string>('');
+  const playerId = user?.id || '';
   const [myRole, setMyRole] = useState<PlayerRole>('spectator');
-  const [joinNameInput, setJoinNameInput] = useState<string>('');
 
   // Game Room state
   const [game, setGame] = useState<MultiplayerGame | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [opponentJustJoined, setOpponentJustJoined] = useState(false);
   // HACK Mode State
   const [hackEnabled, setHackEnabled] = useState(false);
   const [hackAnalysis, setHackAnalysis] = useState<HackAnalysis | null>(null);
@@ -77,7 +85,7 @@ export default function MultiplayerGamePage() {
     return () => {
       active = false;
     };
-  }, [hackEnabled, game?.current_fen, game?.status, language]);
+  }, [hackEnabled, game, language]);
 
   // Dialogue & Reaction state
   const [friendComment, setFriendComment] = useState<string>('Game ready! Make your move! ♟️');
@@ -85,35 +93,35 @@ export default function MultiplayerGamePage() {
   // Draw Offer State
   const [drawOfferPending, setDrawOfferPending] = useState(false);
 
-  // Initialize or restore player session identity
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let storedId = localStorage.getItem('funnychess_player_id');
-    if (!storedId) {
-      storedId = user?.id || 'player_' + Math.random().toString(36).substring(2, 10);
-      localStorage.setItem('funnychess_player_id', storedId);
-    }
-    setPlayerId(storedId);
-    setJoinNameInput(user?.name || 'Guest Challenger');
-  }, [user]);
+  // Trigger funny comment and speech
+  const triggerComment = useCallback((event: FriendGameEvent, priority: 'high' | 'medium' | 'low' = 'medium') => {
+    const comment = getFriendComment(event, speech.voiceLanguage);
+    setFriendComment(comment);
+    speech.speak(comment, { priority, lang: speech.voiceLanguage });
+  }, [speech]);
 
   // Load and subscribe to game
   useEffect(() => {
-    if (!gameId || !playerId) return;
+    if (!gameId || !isAuthenticated || !playerId) return;
 
     let isSubscribed = true;
 
     async function loadGame() {
       setLoading(true);
-      const data = await gameService.getGame(gameId);
+      setErrorStatus(null);
+      setErrorMessage('');
+
+      const res = await gameService.getGameDetails(gameId);
       if (!isSubscribed) return;
 
-      if (!data) {
-        setErrorStatus('not_found');
+      if (!res.success) {
+        setErrorStatus(res.error);
+        setErrorMessage(res.message || '');
         setLoading(false);
         return;
       }
 
+      const data = res.game;
       setGame(data);
 
       // Determine player's role
@@ -121,7 +129,7 @@ export default function MultiplayerGamePage() {
         setMyRole('white');
       } else if (data.player_black === playerId) {
         setMyRole('black');
-      } else if (data.player_white && data.player_black) {
+      } else {
         setMyRole('spectator');
       }
 
@@ -130,10 +138,43 @@ export default function MultiplayerGamePage() {
 
     loadGame();
 
+    // Auto-resync when returning to tab or coming back online
+    const handleRecheck = () => {
+      gameService.getGameDetails(gameId).then((res) => {
+        if (isSubscribed && res.success) {
+          setGame(res.game);
+        }
+      });
+    };
+    window.addEventListener('focus', handleRecheck);
+    window.addEventListener('online', handleRecheck);
+
     // Subscribe to real-time updates
     const unsubscribe = gameService.subscribeToGame(gameId, (updatedGame, event, meta) => {
       if (!isSubscribed) return;
-      setGame(updatedGame);
+
+      setGame((prevGame) => {
+        // Automatically detect transition from waiting to active (opponent joined!)
+        if (prevGame?.status === 'waiting' && updatedGame.status === 'active') {
+          setOpponentJustJoined(true);
+          sounds.playSuccess();
+          confetti({ particleCount: 75, spread: 70 });
+          triggerComment('game_start', 'high');
+          setTimeout(() => {
+            setOpponentJustJoined(false);
+          }, 4500);
+        }
+        return updatedGame;
+      });
+
+      // Update role if newly assigned or matched
+      if (updatedGame.player_white === playerId) {
+        setMyRole('white');
+      } else if (updatedGame.player_black === playerId) {
+        setMyRole('black');
+      } else {
+        setMyRole('spectator');
+      }
 
       // Handle real-time audio and speech triggers
       if (event === 'player_joined') {
@@ -141,36 +182,30 @@ export default function MultiplayerGamePage() {
         triggerComment('game_start');
       } else if (event === 'chess_move' && meta?.move) {
         const move = meta.move;
-        const chess = new Chess(updatedGame.current_fen);
+        const currentTurn = updatedGame.current_turn;
+        const movedByOpponent = (myRole === 'white' && currentTurn === 'w') ||
+                                (myRole === 'black' && currentTurn === 'b');
 
-        if (move.captured) {
-          sounds.playCapture();
-        } else if (chess.inCheck()) {
-          sounds.playCheck();
-        } else {
-          sounds.playMove();
+        sounds.playMove();
+
+        if (meta?.fen) {
+          const testChess = new Chess(meta.fen);
+          if (testChess.inCheck()) {
+            sounds.playCheck();
+          } else if (move.captured) {
+            sounds.playCapture();
+          }
         }
 
-        // Check contextual reaction based on who moved
-        const movedByOpponent = (myRole === 'white' && updatedGame.current_turn === 'w') ||
-                                (myRole === 'black' && updatedGame.current_turn === 'b');
-
-        if (updatedGame.status === 'completed') {
-          if (updatedGame.winner === myRole) {
-            triggerComment('checkmate_you_win', 'high');
-            confetti({ particleCount: 80, spread: 70 });
-          } else if (updatedGame.winner === 'draw') {
-            triggerComment('draw', 'high');
-          } else {
-            triggerComment('checkmate_friend_wins', 'high');
-          }
-        } else if (chess.inCheck()) {
+        // Trigger funny speech for checks and captures
+        if (move.san && move.san.includes('+')) {
           if (movedByOpponent) {
-            triggerComment('friend_gives_check');
+            triggerComment('friend_gives_check', 'high');
           } else {
-            triggerComment('you_give_check');
+            triggerComment('you_give_check', 'high');
           }
         } else if (move.captured === 'q') {
+          sounds.playCapture();
           if (movedByOpponent) {
             triggerComment('friend_captures_queen');
           } else {
@@ -181,6 +216,17 @@ export default function MultiplayerGamePage() {
             triggerComment('friend_captures_piece');
           } else {
             triggerComment('you_capture_piece');
+          }
+        }
+
+        if (updatedGame.status === 'completed') {
+          if (updatedGame.winner === myRole) {
+            triggerComment('checkmate_you_win', 'high');
+            confetti({ particleCount: 80, spread: 70 });
+          } else if (updatedGame.winner === 'draw') {
+            triggerComment('draw', 'high');
+          } else {
+            triggerComment('checkmate_friend_wins', 'high');
           }
         }
       } else if (event === 'game_resigned') {
@@ -200,37 +246,38 @@ export default function MultiplayerGamePage() {
 
     return () => {
       isSubscribed = false;
+      window.removeEventListener('focus', handleRecheck);
+      window.removeEventListener('online', handleRecheck);
       unsubscribe();
     };
-  }, [gameId, playerId, myRole]);
+  }, [gameId, playerId, myRole, isAuthenticated, triggerComment]);
 
-  // Trigger funny comment and speech
-  const triggerComment = useCallback((event: FriendGameEvent, priority: 'high' | 'medium' | 'low' = 'medium') => {
-    const comment = getFriendComment(event, speech.voiceLanguage);
-    setFriendComment(comment);
-    speech.speak(comment, { priority, lang: speech.voiceLanguage });
-  }, [speech]);
-
-  // Join as player 2
+  // Join as player 2 strictly authenticated
   const handleJoinGame = async () => {
-    if (!gameId || !playerId) return;
+    if (!gameId || !isAuthenticated || joining) return;
+    setJoining(true);
+    setJoinError(null);
+
     const res = await gameService.joinGame(
       gameId,
-      joinNameInput.trim() || 'Challenger',
-      playerId
+      user?.name || 'Challenger'
     );
 
     if ('error' in res) {
+      setJoining(false);
       if (res.error === 'game_full') {
         setErrorStatus('full');
+      } else if (res.error === 'already_joined') {
+        setJoinError(res.message || "You can't join your own game!");
       } else {
-        alert('Could not join game: ' + res.error);
+        setJoinError(res.message || 'Could not join game: ' + res.error);
       }
       return;
     }
 
     setGame(res.game);
     setMyRole(res.role);
+    setJoining(false);
     sounds.playSuccess();
     triggerComment('game_start');
   };
@@ -280,22 +327,149 @@ export default function MultiplayerGamePage() {
 
   // Rematch
   const handleRematch = async () => {
-    if (!game) return;
-    const newGame = await gameService.createGame({
-      creatorName: myRole === 'white' ? game.player_white_name : game.player_black_name || 'Player',
-      creatorId: playerId,
-      preferredColor: myRole === 'white' ? 'black' : 'white', // Swap colors
-    });
-    router.push(`/game/${newGame.id}`);
+    if (!game || !user) return;
+    try {
+      const newGame = await gameService.createGame({
+        creatorName: user.name,
+        preferredColor: myRole === 'white' ? 'black' : 'white', // Swap colors
+      });
+      router.push(`/game/${newGame.id}`);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to create rematch');
+    }
+  };
+
+  const getShareUrl = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.href;
+    }
+    return `${getSiteUrl()}/game/${gameId}`;
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    navigator.clipboard.writeText(getShareUrl());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 1. Loading State
+  const shareOnWhatsApp = () => {
+    const url = getShareUrl();
+    const text = `♟️ Challenge me on FunnyChess! Click here to play real-time chess with me: ${url}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // 1. Auth Checking State
+  if (authLoading) {
+    return (
+      <div className="container" style={{ padding: '6rem 1rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '1rem', animation: 'pulseSubtle 1s infinite' }}>
+          ♟️
+        </div>
+        <h2>Checking authentication...</h2>
+        <p style={{ color: 'var(--text-muted)' }}>Connecting with Supabase Auth</p>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated State: Sign in to join this game
+  if (!isAuthenticated) {
+    return (
+      <div className="container" style={{ padding: '5rem 1rem', maxWidth: '540px', textAlign: 'center' }}>
+        <div
+          className="glass-panel"
+          style={{
+            padding: '2.75rem 2rem',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 158, 11, 0.1)',
+          }}
+        >
+          <div
+            style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(139, 92, 246, 0.25))',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.2rem',
+              margin: '0 auto 1.25rem',
+              boxShadow: '0 8px 24px rgba(245, 158, 11, 0.2)',
+            }}
+          >
+            ⚔️
+          </div>
+
+          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.65rem' }}>
+            {t('multiplayerAuth.signInToJoin', 'Sign in to join this game')}
+          </h2>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem' }}>
+            You have been invited to match <strong style={{ color: 'var(--accent-gold)' }}>{gameId}</strong> on FunnyChess. Sign in with Google to accept the challenge!
+          </p>
+
+          <button
+            onClick={() => signInWithGoogle(`/game/${gameId}`)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              padding: '0.95rem 1.5rem',
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
+              borderRadius: 'var(--radius-full)',
+              fontWeight: 700,
+              fontSize: '1rem',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 16px rgba(255, 255, 255, 0.2)',
+              cursor: 'pointer',
+              border: 'none',
+              marginBottom: '1.25rem',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>{t('multiplayerAuth.signInWithGoogle', 'Sign in with Google')}</span>
+          </button>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              fontSize: '0.82rem',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <ShieldCheck size={15} color="var(--accent-emerald)" />
+            <span>{t('multiplayerAuth.authRequiredNotice', 'Your account is required for secure multiplayer.')}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Loading Game Room State
   if (loading) {
     return (
       <div className="container" style={{ padding: '6rem 1rem', textAlign: 'center' }}>
@@ -303,147 +477,483 @@ export default function MultiplayerGamePage() {
           ♟️
         </div>
         <h2>Connecting to Game Room...</h2>
-        <p style={{ color: 'var(--text-muted)' }}>Synchronizing with Supabase Realtime</p>
+        <p style={{ color: 'var(--text-muted)' }}>Synchronizing authoritative state with Supabase</p>
       </div>
     );
   }
 
-  // 2. Error States
-  if (errorStatus === 'not_found' || !game) {
+  // 4. Classified Error States
+  if (errorStatus || !game) {
+    let errorTitle = 'Game Not Found';
+    let errorEmoji = '😅';
+    let errorDescription = 'This room code doesn’t exist or has expired. Check your invite link or create a new room!';
+    let showRetry = false;
+
+    if (errorStatus === 'db_error') {
+      errorTitle = 'Database Connection Issue';
+      errorEmoji = '🔌';
+      errorDescription = errorMessage || 'Could not connect to the multiplayer database. Please make sure the database migration has been run in Supabase, or check your connection.';
+      showRetry = true;
+    } else if (errorStatus === 'network_error') {
+      errorTitle = 'Connection Failed';
+      errorEmoji = '📡';
+      errorDescription = errorMessage || 'Check your internet connection and try reconnecting.';
+      showRetry = true;
+    } else if (errorStatus === 'expired') {
+      errorTitle = 'Room Expired';
+      errorEmoji = '⏳';
+      errorDescription = 'This game room has expired due to 24 hours of inactivity. Please create a fresh game room!';
+    } else if (errorStatus === 'invalid_id') {
+      errorTitle = 'Invalid Room Code';
+      errorEmoji = '🔍';
+      errorDescription = 'The room code in your link doesn’t match the expected format (e.g. FC-XXXXXX).';
+    } else if (errorStatus === 'full' || errorStatus === 'game_full') {
+      errorTitle = 'Room is Full';
+      errorEmoji = '👥';
+      errorDescription = 'This match is already in progress between two players.';
+    } else if (errorStatus === 'permission_error') {
+      errorTitle = 'Access Restricted';
+      errorEmoji = '🔒';
+      errorDescription = errorMessage || 'You do not have permission to view or join this game room.';
+    }
+
     return (
-      <div className="container" style={{ padding: '6rem 1rem', maxWidth: '500px', textAlign: 'center' }}>
+      <div className="container" style={{ padding: '6rem 1rem', maxWidth: '520px', textAlign: 'center' }}>
         <div className="glass-panel" style={{ padding: '3rem 2rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>😅</div>
-          <h2 style={{ marginBottom: '0.5rem' }}>Game Not Found</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-            This room code doesn’t exist or has expired. Check your invite link or create a new room!
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{errorEmoji}</div>
+          <h2 style={{ marginBottom: '0.5rem' }}>{errorTitle}</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.75rem', lineHeight: 1.5, fontSize: '0.95rem' }}>
+            {errorDescription}
           </p>
-          <button onClick={() => router.push('/play/friend')} className="btn-primary" style={{ width: '100%' }}>
-            <ArrowLeft size={16} />
-            <span>Create New Game</span>
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {showRetry && (
+              <button
+                onClick={() => {
+                  setErrorStatus(null);
+                  setLoading(true);
+                  gameService.getGameDetails(gameId).then((res) => {
+                    if (res.success) {
+                      setGame(res.game);
+                      setErrorStatus(null);
+                    } else {
+                      setErrorStatus(res.error);
+                      setErrorMessage(res.message || '');
+                    }
+                    setLoading(false);
+                  });
+                }}
+                className="btn-primary"
+                style={{ padding: '0.75rem 1.5rem' }}
+              >
+                <span>Retry Connection</span>
+              </button>
+            )}
+            <button
+              onClick={() => router.push('/play/friend')}
+              className={showRetry ? 'btn-secondary' : 'btn-primary'}
+              style={{ width: showRetry ? 'auto' : '100%', padding: '0.75rem 1.5rem' }}
+            >
+              <ArrowLeft size={16} />
+              <span>{errorStatus === 'full' || errorStatus === 'game_full' ? 'Create New Game' : 'Back to Play Friend'}</span>
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // 3. Challenge Join Prompt (if visitor is not yet in the game)
-  if (myRole === 'spectator' && game.status === 'waiting') {
-    return (
-      <div className="container" style={{ padding: '5rem 1rem', maxWidth: '520px', textAlign: 'center' }}>
-        <div className="glass-panel" style={{ padding: '2.5rem 2rem', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>You’ve Been Challenged!</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.75rem' }}>
-            <strong style={{ color: '#ffffff' }}>{game.player_white_name}</strong> invited you to a live chess duel on FunnyChess!
-          </p>
+  // Dedicated Guard: A friend game is ONLY ready to play when active/completed with two DIFFERENT authenticated players
+  const isFriendGameReady =
+    Boolean(game) &&
+    game!.game_type === 'friend' &&
+    (game!.status === 'active' || game!.status === 'completed') &&
+    Boolean(game!.player_white) &&
+    Boolean(game!.player_black) &&
+    game!.player_white !== game!.player_black;
 
-          <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-              Your Display Name
-            </label>
-            <input
-              type="text"
-              value={joinNameInput}
-              onChange={(e) => setJoinNameInput(e.target.value)}
-              placeholder="Enter your name"
+  // 4. Waiting / Not Ready State Handling
+  if (!isFriendGameReady) {
+    if (game.status === 'waiting') {
+      const isCreator = Boolean(
+        playerId && (game.player_white === playerId || game.player_black === playerId)
+      );
+
+      // 4A. Creator Waiting for Opponent Screen
+      if (isCreator || myRole === 'white' || myRole === 'black') {
+        const creatorPlayingColor = game.player_white === playerId ? 'White (⚪)' : 'Black (⚫)';
+        return (
+          <div className="container" style={{ padding: '4.5rem 1rem 6rem', maxWidth: '580px', textAlign: 'center' }}>
+            <div
+              className="glass-panel"
               style={{
-                width: '100%',
+                padding: '3rem 2rem',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 158, 11, 0.1)',
+                position: 'relative',
+              }}
+            >
+              {/* Opponent Joined Transition Flash Banner */}
+              {opponentJustJoined && (
+                <div
+                  style={{
+                    padding: '1.25rem',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                    border: '1px solid #10b981',
+                    color: '#34d399',
+                    fontSize: '1.15rem',
+                    fontWeight: 800,
+                    marginBottom: '1.5rem',
+                    animation: 'pulseSubtle 0.8s infinite',
+                  }}
+                >
+                  🎉 Opponent Joined! Starting live match...
+                </div>
+              )}
+
+              {/* Animated Chess Icon */}
+              <div
+                style={{
+                  width: '72px',
+                  height: '72px',
+                  borderRadius: '22px',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(139, 92, 246, 0.25))',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2.5rem',
+                  margin: '0 auto 1.25rem',
+                  boxShadow: '0 8px 24px rgba(245, 158, 11, 0.2)',
+                  animation: 'pulseSubtle 1.4s infinite',
+                }}
+              >
+                ⏳
+              </div>
+
+              <div className="badge badge-purple" style={{ marginBottom: '0.85rem' }}>
+                <Users size={13} />
+                <span>Waiting for Opponent</span>
+              </div>
+
+              <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+                Your Chess Room is Ready!
+              </h2>
+
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                Share this invite link with your friend. You are playing as <strong style={{ color: 'var(--accent-gold)' }}>{creatorPlayingColor}</strong>. The match will start automatically the second your friend joins!
+              </p>
+
+              {/* Room Code Badge */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.45rem 1.15rem',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                  color: 'var(--accent-gold)',
+                  marginBottom: '1.5rem',
+                  letterSpacing: '1px',
+                }}
+              >
+                <span>Room Code:</span>
+                <span style={{ fontFamily: 'monospace', color: '#ffffff', fontSize: '1.05rem' }}>{game.id}</span>
+              </div>
+
+              {/* Shareable Link Box */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)',
+                  marginBottom: '1.25rem',
+                }}
+              >
+                <LinkIcon size={16} color="var(--accent-gold)" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  readOnly
+                  value={getShareUrl()}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent-gold)',
+                    fontSize: '0.88rem',
+                    fontFamily: 'monospace',
+                    flex: 1,
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={copyLink}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: copied ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    flexShrink: 0,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copied ? 'Copied!' : 'Copy Link'}</span>
+                </button>
+              </div>
+
+              {/* Action Buttons: WhatsApp & Back */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.75rem' }}>
+                <button
+                  onClick={shareOnWhatsApp}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.85rem 1.5rem',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: '#25D366',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(37, 211, 102, 0.3)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <MessageCircle size={18} />
+                  <span>Share on WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => router.push('/play/friend')}
+                  className="btn-secondary"
+                  style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back to Play Friend</span>
+                </button>
+              </div>
+
+              {/* Realtime Pulse Indicator */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.55rem',
+                  color: '#34d399',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  padding: '0.6rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                }}
+              >
+                <span
+                  style={{
+                    width: '9px',
+                    height: '9px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    display: 'inline-block',
+                    animation: 'pulseSubtle 0.9s infinite',
+                    boxShadow: '0 0 10px #10b981',
+                  }}
+                />
+                <span>Waiting for your friend to join... ⏳ Real-time listener active</span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.65rem' }}>
+                You can keep this page open. The game will start automatically when your friend joins.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // 4B. Challenge Join Prompt (for Player B / Invited Friend)
+      const hostName = game.player_white_name || game.player_black_name || 'Your friend';
+      return (
+        <div className="container" style={{ padding: '5rem 1rem 6rem', maxWidth: '540px', textAlign: 'center' }}>
+          <div
+            className="glass-panel"
+            style={{
+              padding: '2.75rem 2rem',
+              border: '1px solid rgba(139, 92, 246, 0.35)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.1)',
+            }}
+          >
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(245, 158, 11, 0.2))',
+                border: '1px solid rgba(139, 92, 246, 0.45)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '2.2rem',
+                margin: '0 auto 1.25rem',
+                boxShadow: '0 8px 24px rgba(139, 92, 246, 0.25)',
+              }}
+            >
+              ⚔️
+            </div>
+
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.4rem' }}>
+              You’ve Been Challenged!
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem' }}>
+              <strong style={{ color: '#ffffff' }}>{hostName}</strong> {t('multiplayerAuth.invitedDuel', 'invited you to a live chess duel on FunnyChess!')}
+            </p>
+
+            {/* Playing As Card */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
                 padding: '0.75rem 1rem',
                 borderRadius: 'var(--radius-md)',
                 backgroundColor: 'rgba(255, 255, 255, 0.04)',
                 border: '1px solid var(--border-subtle)',
-                color: '#ffffff',
-                fontSize: '0.95rem',
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          <button onClick={handleJoinGame} className="btn-primary" style={{ width: '100%', padding: '0.85rem', fontSize: '1rem' }}>
-            <Sparkles size={16} />
-            <span>Accept Challenge & Play</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 4. Waiting Room (Creator waiting for friend)
-  if (game.status === 'waiting') {
-    return (
-      <div className="container" style={{ padding: '5rem 1rem', maxWidth: '560px', textAlign: 'center' }}>
-        <div className="glass-panel" style={{ padding: '3rem 2rem', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulseSubtle 1.2s infinite' }}>
-            ⏳
-          </div>
-          <h2 style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>Waiting for Your Friend...</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-            Share this invite link. The game will launch immediately in real time as soon as your friend clicks to join!
-          </p>
-
-          {/* Shareable Link Box */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              padding: '0.6rem 0.85rem',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-subtle)',
-              marginBottom: '1.5rem',
-            }}
-          >
-            <LinkIcon size={16} color="var(--accent-gold)" />
-            <input
-              type="text"
-              readOnly
-              value={typeof window !== 'undefined' ? window.location.href : ''}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--accent-gold)',
-                fontSize: '0.88rem',
-                fontFamily: 'monospace',
-                flex: 1,
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={copyLink}
-              style={{
-                padding: '0.45rem 0.85rem',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: copied ? '#10b981' : 'rgba(255, 255, 255, 0.08)',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
               }}
             >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
+              <UserAvatar
+                src={user?.avatar_url}
+                name={user?.name || 'Player'}
+                size={40}
+                borderRadius="50%"
+                border="1px solid var(--accent-gold)"
+              />
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Playing As
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>
+                  {user?.name || 'Challenger'}
+                </div>
+              </div>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#10b981', fontSize: '0.88rem', fontWeight: 600 }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulseSubtle 0.8s infinite' }} />
-            <span>Room Code: {game.id} • Real-time listener active</span>
+            {joinError && (
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textAlign: 'left',
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{joinError}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button
+                onClick={handleJoinGame}
+                disabled={joining}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  fontSize: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                {joining ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Connecting to Match...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>{t('multiplayerAuth.acceptChallenge', 'Accept Challenge & Play')}</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => router.push('/play/friend')}
+                className="btn-secondary"
+                style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
+              >
+                <ArrowLeft size={16} />
+                <span>Back to Play Friend</span>
+              </button>
+            </div>
           </div>
+        </div>
+      );
+    }
+
+    // 4C. Incomplete or Inactive State (Fallback)
+    return (
+      <div className="container" style={{ padding: '6rem 1rem', maxWidth: '520px', textAlign: 'center' }}>
+        <div className="glass-panel" style={{ padding: '3rem 2rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>♟️</div>
+          <h2 style={{ marginBottom: '0.5rem' }}>Waiting for Match Setup</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.75rem', lineHeight: 1.5, fontSize: '0.95rem' }}>
+            This room requires two active players before the chess match begins.
+          </p>
+          <button
+            onClick={() => router.push('/play/friend')}
+            className="btn-primary"
+            style={{ width: '100%', padding: '0.75rem 1.5rem' }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back to Play Friend</span>
+          </button>
         </div>
       </div>
     );
   }
 
   // 5. Active & Completed Game Arena
-  const opponentName = myRole === 'white' ? (game.player_black_name || 'Friend') : game.player_white_name;
-  const isMyTurn = (myRole === 'white' && game.current_turn === 'w') ||
-                   (myRole === 'black' && game.current_turn === 'b');
+  const opponentName =
+    myRole === 'white'
+      ? (game.player_black_name || 'Opponent (Black)')
+      : (game.player_white_name || 'Opponent (White)');
+  const myDisplayName =
+    myRole === 'white'
+      ? (game.player_white_name || user?.name || 'You')
+      : (game.player_black_name || user?.name || 'You');
+  const isMyTurn =
+    (myRole === 'white' && game.current_turn === 'w') ||
+    (myRole === 'black' && game.current_turn === 'b');
   const isGameOver = game.status === 'completed';
 
   return (
@@ -592,6 +1102,31 @@ export default function MultiplayerGamePage() {
         </div>
       )}
 
+      {/* Opponent Joined Celebratory Live Match Banner */}
+      {opponentJustJoined && (
+        <div
+          className="glass-panel"
+          style={{
+            padding: '1rem 1.5rem',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid #10b981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)',
+            animation: 'fadeIn 0.3s ease',
+          }}
+        >
+          <span style={{ fontSize: '1.4rem' }}>🎉</span>
+          <span style={{ fontWeight: 800, color: '#ffffff', fontSize: '1.05rem' }}>
+            Opponent Joined! The live match has started!
+          </span>
+        </div>
+      )}
+
       {/* Main Playing Arena */}
       <div
         style={{
@@ -697,7 +1232,7 @@ export default function MultiplayerGamePage() {
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#ffffff' }}>
-                  {myRole === 'white' ? game.player_white_name : game.player_black_name || 'You'} (You)
+                  {myDisplayName} (You)
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {myRole === 'white' ? 'White (⚪)' : 'Black (⚫)'}

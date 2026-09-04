@@ -59,39 +59,82 @@ CREATE TRIGGER on_auth_user_created
 
 -- 2. Games Table (Supports AI and Multiplayer)
 CREATE TABLE IF NOT EXISTS public.games (
-  id TEXT PRIMARY KEY, -- Friendly alphanumeric ID e.g. "AB7X92"
-  game_type TEXT NOT NULL CHECK (game_type IN ('ai', 'friend')),
-  player_white UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  player_black UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  id TEXT PRIMARY KEY, -- Friendly alphanumeric ID e.g. "FC-K9M2P4"
+  game_type TEXT NOT NULL DEFAULT 'friend' CHECK (game_type IN ('ai', 'friend')),
+  player_white UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT NULL,
+  player_black UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT NULL,
   player_white_name TEXT DEFAULT 'Player White',
   player_black_name TEXT DEFAULT 'Player Black',
   difficulty TEXT CHECK (difficulty IN ('easy', 'intermediate', 'hard')),
-  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'checkmate', 'stalemate', 'draw', 'resigned', 'abandoned')),
+  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'completed', 'checkmate', 'stalemate', 'draw', 'resigned', 'abandoned')),
   current_fen TEXT NOT NULL DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   move_history JSONB NOT NULL DEFAULT '[]'::jsonb,
-  winner TEXT, -- 'white', 'black', 'draw'
+  last_move JSONB DEFAULT NULL,
+  winner TEXT DEFAULT NULL, -- 'white', 'black', 'draw'
+  draw_offer TEXT DEFAULT NULL CHECK (draw_offer IN ('white', 'black', NULL)),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.games REPLICA IDENTITY FULL;
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Games are viewable by players or anyone with the link."
+CREATE POLICY "Authenticated users can view joinable or participating games."
   ON public.games FOR SELECT
-  USING ( true );
-
-CREATE POLICY "Authenticated users can create games."
-  ON public.games FOR INSERT
-  WITH CHECK ( true );
-
-CREATE POLICY "Players can update games they are participating in."
-  ON public.games FOR UPDATE
+  TO authenticated
   USING (
-    auth.uid() = player_white OR
-    auth.uid() = player_black OR
-    player_black IS NULL OR
-    player_white IS NULL
+    status = 'waiting'
+    OR auth.uid() = player_white
+    OR auth.uid() = player_black
   );
+
+CREATE POLICY "Authenticated users can create waiting games."
+  ON public.games FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    status = 'waiting'
+    AND (
+      (player_white = auth.uid() AND player_black IS NULL)
+      OR
+      (player_black = auth.uid() AND player_white IS NULL)
+    )
+  );
+
+CREATE POLICY "Authenticated users can join waiting games."
+  ON public.games FOR UPDATE
+  TO authenticated
+  USING (
+    status = 'waiting'
+    AND (player_white IS NULL OR player_black IS NULL)
+    AND auth.uid() != COALESCE(player_white, player_black)
+  )
+  WITH CHECK (
+    status IN ('waiting', 'active')
+    AND (auth.uid() = player_white OR auth.uid() = player_black)
+  );
+
+CREATE POLICY "Participants can update active or waiting games."
+  ON public.games FOR UPDATE
+  TO authenticated
+  USING (
+    status IN ('waiting', 'active')
+    AND (auth.uid() = player_white OR auth.uid() = player_black)
+  )
+  WITH CHECK (
+    status IN ('waiting', 'active', 'completed', 'checkmate', 'stalemate', 'draw', 'resigned', 'abandoned')
+    AND (auth.uid() = player_white OR auth.uid() = player_black)
+  );
+
+-- Enable Realtime publication for public.games
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'games'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.games;
+  END IF;
+END $$;
 
 -- 3. Learning Progress Table
 CREATE TABLE IF NOT EXISTS public.learning_progress (
