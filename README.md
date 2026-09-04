@@ -2,6 +2,8 @@
 
 > **“Chess is not hard. You just haven’t learned it the fun way yet.”**
 
+🚀 **Live Deployment**: [https://funny-chess-sigma.vercel.app](https://funny-chess-sigma.vercel.app)
+
 FunnyChess is a modern, interactive, and humorous chess learning & playing web platform. Built to make chess accessible, engaging, and delightfully fun for players of all skill levels — from complete novices to seasoned tacticians.
 
 ---
