@@ -37,6 +37,7 @@ export interface UserProfile {
   learning_progress: number; // percentage
   completed_lessons: number[];
   achievements: string[];
+  is_first_login?: boolean;
 }
 
 export interface AchievementNotification {
@@ -63,6 +64,8 @@ interface AuthContextType {
   recordDetailedGame: (game: PersistedGameRecord) => void;
   recordGameResult: (result: 'win' | 'loss' | 'draw', difficulty: string) => void;
   updateAvatar: (newAvatarUrl: string) => Promise<void>;
+  isFirstTimeUser: boolean;
+  dismissFirstTimeModal: () => Promise<void>;
 }
 
 /**
@@ -126,18 +129,19 @@ const DEFAULT_GUEST: UserProfile = {
   email: 'guest@funnychess.local',
   avatar_url: '',
   isGuest: true,
-  xp: 350,
+  xp: 250,
   chess_level: 'Piece Explorer',
   chess_level_number: 2,
-  games_played: 1,
-  wins: 1,
+  games_played: 0,
+  wins: 0,
   losses: 0,
   draws: 0,
-  ai_games: { played: 1, wins: 1, losses: 0, draws: 0 },
+  ai_games: { played: 0, wins: 0, losses: 0, draws: 0 },
   friend_games: { played: 0, wins: 0, losses: 0, draws: 0 },
-  learning_progress: 20,
-  completed_lessons: [1, 2, 3, 4, 5],
-  achievements: ['first_game', 'all_pieces'],
+  learning_progress: 0,
+  completed_lessons: [],
+  achievements: [],
+  is_first_login: false,
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -146,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<AchievementNotification | null>(null);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
   useEffect(() => {
     // 1. Check local guest storage first
@@ -153,12 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const savedUser = localStorage.getItem('funnychess_user');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        // Ensure new fields exist gracefully
-        const levelInfo = getLevelFromXP(parsed.xp || 350);
+        const levelInfo = getLevelFromXP(parsed.xp || 250);
         setUser({
           ...DEFAULT_GUEST,
           ...parsed,
-          xp: parsed.xp || 350,
+          xp: parsed.xp || 250,
           chess_level: levelInfo.title.en,
           chess_level_number: levelInfo.level,
           ai_games: parsed.ai_games || { played: parsed.games_played || 0, wins: parsed.wins || 0, losses: parsed.losses || 0, draws: parsed.draws || 0 },
@@ -172,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(DEFAULT_GUEST);
     }
 
-    // 2. If Supabase is configured, listen to real session
+    // 2. If Supabase is configured, listen to real session and sync authoritative data
     const supabase = getSupabase();
     if (supabase) {
       const syncSessionUser = async (sessionUser: any) => {
@@ -181,24 +185,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let cachedUser: UserProfile | null = null;
         try {
           const saved = localStorage.getItem('funnychess_user');
-          if (saved) cachedUser = JSON.parse(saved);
+          if (saved && saved.startsWith('{')) {
+            const parsed = JSON.parse(saved);
+            if (parsed.id === sessionUser.id) {
+              cachedUser = parsed;
+            }
+          }
         } catch {}
 
         const resolvedAvatar = resolveAvatarUrl(sessionUser, cachedUser?.avatar_url);
         const resolvedName = resolveUserName(sessionUser, cachedUser?.name);
 
-        // Attempt to load cloud profile from Supabase if table exists
+        // 1. Attempt to load authoritative cloud profile from Supabase
         let dbProfile: any = null;
+        let isNewProfile = false;
+
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', sessionUser.id)
             .maybeSingle();
-          if (data) dbProfile = data;
-        } catch {}
 
-        // Load cloud learning progress if available
+          if (data) {
+            dbProfile = data;
+          } else if (!error || error.code === 'PGRST116') {
+            // Profile does not exist yet (brand new Google signup): create authoritative profile
+            const { data: createdProfile } = await supabase
+              .from('profiles')
+              .insert({
+                id: sessionUser.id,
+                name: resolvedName,
+                email: sessionUser.email,
+                avatar_url: resolvedAvatar,
+                preferred_language: 'en',
+                preferred_voice_language: 'en',
+                chess_level: 'Piece Explorer',
+                xp: 250,
+                games_played: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                is_first_login: true,
+              })
+              .select()
+              .single();
+
+            if (createdProfile) {
+              dbProfile = createdProfile;
+              isNewProfile = true;
+            }
+          }
+        } catch (err) {
+          console.warn('[AuthContext] error fetching/creating profile:', err);
+        }
+
+        // Determine if first-time user:
+        // True only if newly created or is_first_login is explicitly true in Supabase
+        const isFirstLogin = isNewProfile || Boolean(dbProfile?.is_first_login);
+        setIsFirstTimeUser(isFirstLogin);
+
+        // 2. Load authoritative cloud learning progress from Supabase
         let cloudLessons: number[] = [];
         try {
           const { data: progressData } = await supabase
@@ -211,7 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch {}
 
-        // Load cloud achievements if available
+        // 3. Load authoritative cloud achievements from Supabase
         let cloudAchievements: string[] = [];
         try {
           const { data: achData } = await supabase
@@ -223,35 +270,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch {}
 
-        const finalAvatar = dbProfile?.avatar_url || resolvedAvatar || cachedUser?.avatar_url || '';
-        const finalName = dbProfile?.name || resolvedName || cachedUser?.name || 'Player';
+        // 4. Resolve authoritative XP & Level
+        // Default starting XP for new account is 250 (Level 2: Piece Explorer)
+        const authoritativeXP = typeof dbProfile?.xp === 'number' ? dbProfile.xp : 250;
+        const levelInfo = getLevelFromXP(authoritativeXP);
 
-        // Preserve accumulated XP and level rather than resetting to default
-        const currentXP = cachedUser?.xp && cachedUser.xp > 500 ? cachedUser.xp : (cachedUser?.xp || 500);
-        const levelInfo = getLevelFromXP(currentXP);
-
-        const mergedLessons = Array.from(new Set([...(cachedUser?.completed_lessons || []), ...cloudLessons]));
-        const mergedAchievements = Array.from(new Set([...(cachedUser?.achievements || []), ...cloudAchievements, 'first_game']));
-        const mergedProgress = Math.round((mergedLessons.length / 25) * 100);
+        const finalName = dbProfile?.name || resolvedName || 'Player';
+        const finalAvatar = dbProfile?.avatar_url || resolvedAvatar || '';
+        const progressPercent = Math.round((cloudLessons.length / 25) * 100);
 
         const authUser: UserProfile = {
           id: sessionUser.id,
           name: finalName,
-          email: sessionUser.email || dbProfile?.email || cachedUser?.email || '',
+          email: sessionUser.email || dbProfile?.email || '',
           avatar_url: finalAvatar,
           isGuest: false,
-          xp: currentXP,
+          xp: authoritativeXP,
           chess_level: levelInfo.title.en,
           chess_level_number: levelInfo.level,
-          games_played: dbProfile?.games_played ?? cachedUser?.games_played ?? 0,
-          wins: dbProfile?.wins ?? cachedUser?.wins ?? 0,
-          losses: dbProfile?.losses ?? cachedUser?.losses ?? 0,
-          draws: dbProfile?.draws ?? cachedUser?.draws ?? 0,
-          ai_games: cachedUser?.ai_games || { played: 0, wins: 0, losses: 0, draws: 0 },
+          games_played: dbProfile?.games_played ?? 0,
+          wins: dbProfile?.wins ?? 0,
+          losses: dbProfile?.losses ?? 0,
+          draws: dbProfile?.draws ?? 0,
+          ai_games: cachedUser?.ai_games || {
+            played: dbProfile?.games_played ?? 0,
+            wins: dbProfile?.wins ?? 0,
+            losses: dbProfile?.losses ?? 0,
+            draws: dbProfile?.draws ?? 0,
+          },
           friend_games: cachedUser?.friend_games || { played: 0, wins: 0, losses: 0, draws: 0 },
-          learning_progress: mergedProgress,
-          completed_lessons: mergedLessons,
-          achievements: mergedAchievements,
+          learning_progress: progressPercent,
+          completed_lessons: cloudLessons,
+          achievements: cloudAchievements,
+          is_first_login: isFirstLogin,
         };
 
         setUser(authUser);
@@ -259,21 +310,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('funnychess_user', JSON.stringify(authUser));
         } catch {}
 
-        // Ensure Supabase profiles table stores the resolved avatar_url if connected
-        if (finalAvatar) {
+        // Sync missing avatar/name back to Supabase if updated from OAuth
+        if ((resolvedAvatar && !dbProfile?.avatar_url) || (resolvedName && !dbProfile?.name)) {
           try {
             await supabase
               .from('profiles')
-              .upsert(
-                {
-                  id: sessionUser.id,
-                  name: finalName,
-                  email: sessionUser.email,
-                  avatar_url: finalAvatar,
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'id' }
-              );
+              .update({
+                avatar_url: finalAvatar,
+                name: finalName,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sessionUser.id);
           } catch {}
         }
       };
@@ -309,6 +356,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Reset to default guest on sign out
           setUser(DEFAULT_GUEST);
+          setIsFirstTimeUser(false);
           try {
             localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
           } catch {}
@@ -326,7 +374,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const dismissNotification = () => setNotification(null);
 
-  // Add XP with level recalculation
+  const dismissFirstTimeModal = async () => {
+    setIsFirstTimeUser(false);
+    if (user && !user.isGuest) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase
+            .from('profiles')
+            .update({ is_first_login: false, updated_at: new Date().toISOString() })
+            .eq('id', user.id);
+        } catch (err) {
+          console.warn('[AuthContext] error updating is_first_login:', err);
+        }
+      }
+    }
+  };
+
+  // Add XP with level recalculation and Supabase cloud sync
   const addXP = (amount: number, reason?: string) => {
     if (!user) return;
     const newXP = user.xp + amount;
@@ -343,9 +408,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
+
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      (async () => {
+        try {
+          await supabase
+            .from('profiles')
+            .update({
+              xp: newXP,
+              chess_level: levelInfo.title.en,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        } catch (err) {
+          console.warn('[AuthContext] error updating XP in Supabase:', err);
+        }
+      })();
+    }
   };
 
-  // Unlock achievement with celebratory popup, sound, and XP reward
+  // Unlock achievement with celebratory popup, sound, XP reward, and cloud persistence
   const unlockAchievement = (achievementId: string) => {
     if (!user) return;
     if (user.achievements.includes(achievementId)) return;
@@ -370,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
 
-    // Persist achievement to Supabase for authenticated users
+    // Persist achievement and updated XP to Supabase for authenticated users
     const supabase = getSupabase();
     if (supabase && !user.isGuest) {
       (async () => {
@@ -385,7 +468,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               },
               { onConflict: 'user_id,achievement_id' }
             );
-        } catch {}
+
+          await supabase
+            .from('profiles')
+            .update({
+              xp: newXP,
+              chess_level: levelInfo.title.en,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        } catch (err) {
+          console.warn('[AuthContext] error updating achievement in Supabase:', err);
+        }
       })();
     }
 
@@ -427,6 +521,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInAsGuest = () => {
     setUser(DEFAULT_GUEST);
+    setIsFirstTimeUser(false);
     try {
       localStorage.setItem('funnychess_user', JSON.stringify(DEFAULT_GUEST));
     } catch {}
@@ -437,6 +532,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (supabase) {
       await supabase.auth.signOut();
     }
+    setIsFirstTimeUser(false);
     try {
       localStorage.removeItem('funnychess_user');
       localStorage.removeItem('funnychess_game_history');
@@ -448,13 +544,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Complete lesson
+  // Complete lesson with XP and cloud synchronization
   const completeLesson = (lessonId: number) => {
     if (!user) return;
-    const currentCompleted = user.completed_lessons || [];
-    if (currentCompleted.includes(lessonId)) return;
+    if (user.completed_lessons.includes(lessonId)) return;
 
-    const newCompleted = [...currentCompleted, lessonId];
+    const newCompleted = [...user.completed_lessons, lessonId];
     const newProgress = Math.round((newCompleted.length / 25) * 100);
     const newXP = user.xp + 50;
     const levelInfo = getLevelFromXP(newXP);
@@ -486,7 +581,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
 
-    // Persist progress to Supabase for authenticated users
+    // Persist progress and XP to Supabase for authenticated users
     const supabase = getSupabase();
     if (supabase && !user.isGuest) {
       (async () => {
@@ -507,11 +602,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase
             .from('profiles')
             .update({
+              xp: newXP,
               chess_level: levelInfo.title.en,
               updated_at: new Date().toISOString(),
             })
             .eq('id', user.id);
-        } catch {}
+        } catch (err) {
+          console.warn('[AuthContext] error updating lesson progress in Supabase:', err);
+        }
       })();
     }
   };
@@ -520,7 +618,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (user?.completed_lessons || []).includes(lessonId);
   };
 
-  // Record game and persist to history
+  // Record game and persist to history & Supabase
   const recordDetailedGame = (gameRecord: PersistedGameRecord) => {
     if (!user) return;
 
@@ -588,7 +686,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('funnychess_user', JSON.stringify(updated));
     } catch {}
 
-    // Persist stats to Supabase for authenticated users
+    // Persist stats and XP to Supabase for authenticated users
     const supabase = getSupabase();
     if (supabase && !user.isGuest) {
       (async () => {
@@ -600,11 +698,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               wins: totalWins,
               losses: totalLosses,
               draws: totalDraws,
+              xp: newXP,
               chess_level: levelInfo.title.en,
               updated_at: new Date().toISOString(),
             })
             .eq('id', user.id);
-        } catch {}
+        } catch (err) {
+          console.warn('[AuthContext] error updating profile game stats in Supabase:', err);
+        }
       })();
     }
   };
@@ -668,6 +769,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         recordDetailedGame,
         recordGameResult,
         updateAvatar,
+        isFirstTimeUser,
+        dismissFirstTimeModal,
       }}
     >
       {children}

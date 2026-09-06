@@ -158,11 +158,6 @@ function PlayAIContent() {
           } else {
             setCapturedWhite((prev) => [...prev, cap]);
           }
-          sounds.playCapture();
-        } else if (currentChess.inCheck()) {
-          sounds.playCheck();
-        } else {
-          sounds.playMove();
         }
 
         // Update board state
@@ -241,10 +236,10 @@ function PlayAIContent() {
         triggerAIReaction('capture_queen');
       }
 
-      // Schedule AI turn
+      // Schedule AI turn after player piece finishes smooth travel
       setTimeout(() => {
         makeAIMove(game);
-      }, 300);
+      }, 650);
     }
   };
 

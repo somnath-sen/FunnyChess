@@ -178,5 +178,16 @@
     "subtitlePlayFriend": "Create private chess rooms, invite your friends, and keep your games synchronized across devices.",
     "subtitleJoinGame": "Sign in to join this match and play live against your friend.",
     "secureFree": "Secure • 100% Free Forever • No Ads"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to FunnyChess!",
+    "welcomeSubtitle": "Your chess journey starts here.",
+    "startingRank": "Level 2: Piece Explorer",
+    "startingXp": "250 XP Starting Boost",
+    "lessonsCount": "0 / 25 Lessons Completed",
+    "gamesCount": "0 Matches Played",
+    "description": "No boring 400-page textbooks. Learn piece movements with jokes, practice with friendly AI, and level up stress-free!",
+    "btnStartLearning": "Start Learning (Free)",
+    "btnExplore": "Explore Freely"
   }
 }

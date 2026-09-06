@@ -11,11 +11,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   avatar_url TEXT,
   preferred_language TEXT NOT NULL DEFAULT 'en',
   preferred_voice_language TEXT NOT NULL DEFAULT 'en',
-  chess_level TEXT NOT NULL DEFAULT 'Beginner I',
+  chess_level TEXT NOT NULL DEFAULT 'Piece Explorer',
+  xp INTEGER NOT NULL DEFAULT 250,
   games_played INTEGER NOT NULL DEFAULT 0,
   wins INTEGER NOT NULL DEFAULT 0,
   losses INTEGER NOT NULL DEFAULT 0,
   draws INTEGER NOT NULL DEFAULT 0,
+  is_first_login BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -46,14 +48,35 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, email, avatar_url, preferred_language, preferred_voice_language)
+  INSERT INTO public.profiles (
+    id,
+    name,
+    email,
+    avatar_url,
+    preferred_language,
+    preferred_voice_language,
+    chess_level,
+    xp,
+    games_played,
+    wins,
+    losses,
+    draws,
+    is_first_login
+  )
   VALUES (
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Funny Chess Player'),
     new.email,
     COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', new.raw_user_meta_data->>'photoURL', new.raw_user_meta_data->>'image', ''),
     'en',
-    'en'
+    'en',
+    'Piece Explorer',
+    250,
+    0,
+    0,
+    0,
+    0,
+    true
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { AchievementToast } from '@/components/Profile/AchievementToast';
+import { WelcomeOnboardingModal } from '@/components/Auth/WelcomeOnboardingModal';
 import { StructuredData } from '@/components/StructuredData';
 
 export const viewport: Viewport = {
@@ -125,6 +126,7 @@ export default function RootLayout({
               <Footer />
             </div>
             <AchievementToast />
+            <WelcomeOnboardingModal />
           </AuthProvider>
         </LanguageProvider>
       </body>

@@ -241,16 +241,7 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
         const movedByOpponent = (currentRole === 'white' && currentTurn === 'w') ||
                                 (currentRole === 'black' && currentTurn === 'b');
 
-        sounds.playMove();
-
-        if (meta?.fen) {
-          const testChess = new Chess(meta.fen);
-          if (testChess.inCheck()) {
-            sounds.playCheck();
-          } else if (move.captured) {
-            sounds.playCapture();
-          }
-        }
+        // Movement sound will play synchronously when the piece physically lands in Chessboard
 
         // Trigger funny speech for checks and captures
         if (move.san && move.san.includes('+')) {
@@ -260,7 +251,6 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
             triggerCommentRef.current('you_give_check', 'high');
           }
         } else if (move.captured === 'q') {
-          sounds.playCapture();
           if (movedByOpponent) {
             triggerCommentRef.current('friend_captures_queen');
           } else {
