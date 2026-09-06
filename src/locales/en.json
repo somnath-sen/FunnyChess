@@ -177,6 +177,8 @@
     "subtitlePlayAI": "Save your games, track your progress, and challenge FunnyChess AI.",
     "subtitlePlayFriend": "Create private chess rooms, invite your friends, and keep your games synchronized across devices.",
     "subtitleJoinGame": "Sign in to join this match and play live against your friend.",
+    "signInToPlayDaily": "Sign in to play Daily Challenge",
+    "subtitleDaily": "Solve daily tactical puzzles, claim your +25 XP streak, and level up your chess profile.",
     "secureFree": "Secure • 100% Free Forever • No Ads"
   },
   "onboarding": {
@@ -235,7 +237,8 @@
     "xpAwarded": "+25 XP Earned",
     "alreadyCompleted": "Today's Challenge Completed! 🎉",
     "alreadyCompletedDesc": "You’ve already mastered today’s puzzle and collected +25 XP. Come back tomorrow for a brand new challenge!",
-    "signInToSave": "Sign in to save your daily streak and claim +25 XP!"
+    "signInToSave": "Sign in to save your daily streak and claim +25 XP!",
+    "signInToPlay": "Sign In to Play"
   }
 }
 

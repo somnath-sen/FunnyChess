@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/context/LanguageContext';
 import { ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
 
-export type ProtectedFeature = 'learn' | 'ai' | 'friend' | 'profile' | 'game' | 'general';
+export type ProtectedFeature = 'learn' | 'ai' | 'friend' | 'profile' | 'game' | 'daily' | 'general';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -95,7 +95,7 @@ export function ProtectedRoute({
   const handleSignIn = async () => {
     try {
       setSigningIn(true);
-      const returnDestination = pathname || (feature === 'learn' ? '/learn' : feature === 'ai' ? '/play/ai' : feature === 'friend' ? '/play/friend' : feature === 'profile' ? '/profile' : '/');
+      const returnDestination = pathname || (feature === 'learn' ? '/learn' : feature === 'ai' ? '/play/ai' : feature === 'friend' ? '/play/friend' : feature === 'profile' ? '/profile' : feature === 'daily' ? '/daily' : '/');
       await signInWithGoogle(returnDestination);
     } catch {
       setSigningIn(false);
@@ -105,6 +105,12 @@ export function ProtectedRoute({
   // Determine localized title, subtitle, and icon based on feature
   const resolveHeader = () => {
     switch (feature) {
+      case 'daily':
+        return {
+          icon: icon || '♟️',
+          title: title || t('auth.signInToPlayDaily', 'Sign in to play Daily Challenge'),
+          subtitle: subtitle || t('auth.subtitleDaily', 'Solve daily tactical puzzles, claim your +25 XP streak, and level up your chess profile.'),
+        };
       case 'learn':
         return {
           icon: icon || '📚',
@@ -143,6 +149,7 @@ export function ProtectedRoute({
         };
     }
   };
+
 
   const headerInfo = resolveHeader();
 

@@ -22,8 +22,17 @@ import {
   Calendar,
   HelpCircle,
 } from 'lucide-react';
+import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 
 export default function DailyChallengePage() {
+  return (
+    <ProtectedRoute feature="daily">
+      <DailyChallengeContent />
+    </ProtectedRoute>
+  );
+}
+
+function DailyChallengeContent() {
   const { t } = useTranslation();
   const {
     user,

@@ -1,14 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { getDailyChallenge } from '@/lib/chess/dailyChallengeData';
-import { Sparkles, Swords, Trophy, ArrowRight, Target, Flame } from 'lucide-react';
+import { Sparkles, Swords, Trophy, ArrowRight, Lock, Loader2 } from 'lucide-react';
 
 export const DailyChallengeSection: React.FC = () => {
   const { t } = useTranslation();
+  const { isAuthenticated, signInWithGoogle } = useAuth();
   const { puzzle } = getDailyChallenge();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      await signInWithGoogle('/daily');
+    } catch {
+      setIsSigningIn(false);
+    }
+  };
 
   return (
     <section
@@ -116,19 +128,93 @@ export const DailyChallengeSection: React.FC = () => {
               flexWrap: 'wrap',
             }}
           >
-            <Link
-              href="/daily"
-              className="btn-primary"
-              style={{
-                padding: '0.85rem 1.85rem',
-                fontSize: '1rem',
-                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
-              }}
-            >
-              <Swords size={18} />
-              <span>{t('dailyChallenge.playChallenge', 'PLAY CHALLENGE')}</span>
-              <ArrowRight size={18} />
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/daily"
+                className="btn-primary"
+                style={{
+                  padding: '0.85rem 1.85rem',
+                  fontSize: '1rem',
+                  boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
+                }}
+              >
+                <Swords size={18} />
+                <span>{t('dailyChallenge.playChallenge', 'PLAY CHALLENGE')}</span>
+                <ArrowRight size={18} />
+              </Link>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Link
+                  href="/daily"
+                  className="btn-primary"
+                  style={{
+                    padding: '0.85rem 1.75rem',
+                    fontSize: '0.98rem',
+                    boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <Lock size={17} />
+                  <span>{t('dailyChallenge.signInToPlay', 'Sign In to Play')}</span>
+                  <ArrowRight size={17} />
+                </Link>
+
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn}
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.85rem 1.35rem',
+                    fontSize: '0.92rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    cursor: isSigningIn ? 'not-allowed' : 'pointer',
+                    color: '#ffffff',
+                  }}
+                >
+                  {isSigningIn ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{t('auth.checkingAccount', 'Connecting...')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="17" height="17" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                      <span>{t('auth.signInWithGoogle', 'Sign in with Google')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             <span
               style={{
@@ -141,13 +227,18 @@ export const DailyChallengeSection: React.FC = () => {
               }}
             >
               <Trophy size={16} />
-              <span>+25 XP Daily Reward</span>
+              <span>
+                {isAuthenticated
+                  ? '+25 XP Daily Reward'
+                  : '+25 XP Daily Streak • Sign in to save'}
+              </span>
             </span>
           </div>
         </div>
 
-        {/* Right Preview Card */}
-        <div
+        {/* Right Preview Card (Clickable to /daily) */}
+        <Link
+          href="/daily"
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -160,6 +251,20 @@ export const DailyChallengeSection: React.FC = () => {
             minWidth: '240px',
             textAlign: 'center',
             zIndex: 2,
+            textDecoration: 'none',
+            color: 'inherit',
+            transition: 'all 0.25s ease',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.45)';
+            e.currentTarget.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.boxShadow = 'none';
           }}
         >
           <div
@@ -209,7 +314,7 @@ export const DailyChallengeSection: React.FC = () => {
           >
             {puzzle.themeLabel}
           </div>
-        </div>
+        </Link>
       </div>
     </section>
   );
