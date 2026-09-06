@@ -396,20 +396,23 @@ function PlayAIContent() {
             </span>
           </button>
 
-          {/* HACK Mode Button (Phase 6 link) */}
+          {/* HACK Mode Button (Phase 6 link) - Stable Width */}
           <button
             onClick={() => setHackEnabled(!hackEnabled)}
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.4rem',
-              padding: '0.55rem 1rem',
+              padding: '0.55rem 0.85rem',
+              minWidth: '130px',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: hackEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: hackEnabled ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.05)',
               border: `1px solid ${hackEnabled ? 'var(--accent-gold)' : 'var(--border-subtle)'}`,
               color: hackEnabled ? 'var(--accent-gold)' : 'var(--text-secondary)',
               fontSize: '0.85rem',
               fontWeight: 700,
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
           >
             <BrainCircuit size={16} />
@@ -565,9 +568,51 @@ function PlayAIContent() {
               )}
             </div>
           </div>
+
+          {/* Primary Action Controls - Anchored under player strip so board and controls never jump */}
+          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem' }}>
+            <button
+              onClick={() => setIsSetupOpen(true)}
+              className="btn-primary"
+              style={{ padding: '0.7rem 0.5rem', fontSize: '0.85rem' }}
+            >
+              <RotateCcw size={15} />
+              <span>New Match</span>
+            </button>
+
+            <button
+              onClick={handleDraw}
+              className="btn-secondary"
+              style={{ padding: '0.7rem 0.5rem', fontSize: '0.85rem' }}
+            >
+              <Handshake size={15} />
+              <span>Offer Draw</span>
+            </button>
+
+            <button
+              onClick={handleResign}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0.7rem 0.5rem',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#f87171',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Flag size={15} />
+              <span>Resign</span>
+            </button>
+          </div>
         </div>
 
-        {/* Right Arena: AI Commentary, Move History & Game Controls */}
+        {/* Right Arena: AI Commentary, HACK Panel & Move History */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* AI Chat Dialogue Bubble */}
           <div
@@ -685,49 +730,8 @@ function PlayAIContent() {
               </div>
             )}
           </div>
-
-          {/* Action Game Controls */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-            <button
-              onClick={() => setIsSetupOpen(true)}
-              className="btn-primary"
-              style={{ padding: '0.75rem 0.5rem', fontSize: '0.88rem' }}
-            >
-              <RotateCcw size={15} />
-              <span>New Match</span>
-            </button>
-
-            <button
-              onClick={handleDraw}
-              className="btn-secondary"
-              style={{ padding: '0.75rem 0.5rem', fontSize: '0.88rem' }}
-            >
-              <Handshake size={15} />
-              <span>Offer Draw</span>
-            </button>
-
-            <button
-              onClick={handleResign}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.4rem',
-                padding: '0.75rem 0.5rem',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Flag size={15} />
-              <span>Resign</span>
-            </button>
-          </div>
         </div>
+
       </div>
 
       {/* AISetupModal */}

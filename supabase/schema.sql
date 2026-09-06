@@ -304,3 +304,30 @@ DROP POLICY IF EXISTS "Users can unlock their own achievements." ON public.achie
 CREATE POLICY "Users can unlock their own achievements."
   ON public.achievements FOR INSERT
   WITH CHECK ( auth.uid() = user_id );
+
+-- 5. Daily Challenge Completions Table (Phase 10)
+CREATE TABLE IF NOT EXISTS public.daily_challenge_completions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  challenge_date DATE NOT NULL,
+  puzzle_id TEXT NOT NULL,
+  xp_awarded INTEGER NOT NULL DEFAULT 25,
+  completed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT unique_user_daily_challenge UNIQUE(user_id, challenge_date)
+);
+
+ALTER TABLE public.daily_challenge_completions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own daily challenge completions." ON public.daily_challenge_completions;
+CREATE POLICY "Users can view their own daily challenge completions."
+  ON public.daily_challenge_completions FOR SELECT
+  USING ( auth.uid() = user_id );
+
+DROP POLICY IF EXISTS "Users can insert their own daily challenge completion." ON public.daily_challenge_completions;
+CREATE POLICY "Users can insert their own daily challenge completion."
+  ON public.daily_challenge_completions FOR INSERT
+  WITH CHECK ( auth.uid() = user_id );
+
+CREATE INDEX IF NOT EXISTS idx_daily_challenge_completions_user_date 
+  ON public.daily_challenge_completions (user_id, challenge_date);
+

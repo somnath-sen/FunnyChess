@@ -66,6 +66,11 @@ interface AuthContextType {
   updateAvatar: (newAvatarUrl: string) => Promise<void>;
   isFirstTimeUser: boolean;
   dismissFirstTimeModal: () => Promise<void>;
+  checkDailyChallengeCompleted: (dateStr: string) => Promise<boolean>;
+  completeDailyChallenge: (
+    puzzleId: string,
+    dateStr: string
+  ) => Promise<{ success: boolean; xpAwarded: number; alreadyCompleted: boolean }>;
 }
 
 /**
@@ -750,6 +755,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Check if today's daily challenge has already been completed by the user
+  const checkDailyChallengeCompleted = async (dateStr: string): Promise<boolean> => {
+    if (!user) return false;
+    if (user.isGuest) {
+      if (typeof window !== 'undefined') {
+        return localStorage.getItem(`funnychess_daily_${dateStr}`) === 'completed';
+      }
+      return false;
+    }
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    try {
+      const { data, error } = await supabase
+        .from('daily_challenge_completions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('challenge_date', dateStr)
+        .maybeSingle();
+      return Boolean(data && !error);
+    } catch {
+      return false;
+    }
+  };
+
+  // Complete daily challenge and award +25 XP exactly once per day
+  const completeDailyChallenge = async (
+    puzzleId: string,
+    dateStr: string
+  ): Promise<{ success: boolean; xpAwarded: number; alreadyCompleted: boolean }> => {
+    if (!user) {
+      return { success: false, xpAwarded: 0, alreadyCompleted: false };
+    }
+
+    // Check if already completed
+    const alreadyDone = await checkDailyChallengeCompleted(dateStr);
+    if (alreadyDone) {
+      return { success: true, xpAwarded: 0, alreadyCompleted: true };
+    }
+
+    // Award +25 XP
+    addXP(25, 'Daily Chess Challenge Complete');
+
+    // For guest users, record locally
+    if (user.isGuest) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`funnychess_daily_${dateStr}`, 'completed');
+      }
+      return { success: true, xpAwarded: 25, alreadyCompleted: false };
+    }
+
+    // For authenticated users, record in Supabase
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('daily_challenge_completions').insert({
+          user_id: user.id,
+          challenge_date: dateStr,
+          puzzle_id: puzzleId,
+          xp_awarded: 25,
+        });
+      } catch (err) {
+        console.warn('[AuthContext] error recording daily challenge in Supabase:', err);
+      }
+    }
+
+    return { success: true, xpAwarded: 25, alreadyCompleted: false };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -771,6 +844,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateAvatar,
         isFirstTimeUser,
         dismissFirstTimeModal,
+        checkDailyChallengeCompleted,
+        completeDailyChallenge,
       }}
     >
       {children}

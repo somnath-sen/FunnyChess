@@ -3,6 +3,7 @@
 import React from 'react';
 import { AnimatedChessBackground } from '@/components/home/AnimatedChessBackground';
 import { HeroSection } from '@/components/home/HeroSection';
+import { DailyChallengeSection } from '@/components/home/DailyChallengeSection';
 import { WhyFunnyChess } from '@/components/home/WhyFunnyChess';
 import { MasterLoopSection } from '@/components/home/MasterLoopSection';
 import { FunnyAISection } from '@/components/home/FunnyAISection';
@@ -19,6 +20,9 @@ export default function HomePage() {
 
       {/* 2. Hero Section */}
       <HeroSection />
+
+      {/* 2B. Daily Chess Challenge Card (Phase 10) */}
+      <DailyChallengeSection />
 
       {/* 3. Why FunnyChess Pillars */}
       <WhyFunnyChess />

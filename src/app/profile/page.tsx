@@ -13,6 +13,8 @@ import {
   PersistedGameRecord 
 } from '@/lib/gamification/gamificationService';
 import { GameReplayModal } from '@/components/Profile/GameReplayModal';
+import { ChessPersonalityCard } from '@/components/Profile/ChessPersonalityCard';
+import { calculateChessPersonality } from '@/lib/chess/personalityEngine';
 import { VoiceControlWidget } from '@/components/Voice/VoiceControlWidget';
 import { useSpeech } from '@/hooks/useSpeech';
 import { 
@@ -95,6 +97,16 @@ function ProfileContent() {
       setRecentGames(history);
     }
   }, [user]);
+
+  // Deterministically calculate Chess Personality from actual gameplay behavior
+  const chessPersonality = React.useMemo(() => {
+    return calculateChessPersonality(recentGames, {
+      games_played: user?.games_played || 0,
+      wins: user?.wins || 0,
+      losses: user?.losses || 0,
+      draws: user?.draws || 0,
+    });
+  }, [recentGames, user?.games_played, user?.wins, user?.losses, user?.draws]);
 
   if (!user) {
     return (
@@ -353,6 +365,9 @@ function ProfileContent() {
           <ArrowRight size={16} />
         </Link>
       </div>
+
+      {/* 3B. Chess Personality Spotlight (Phase 10) */}
+      <ChessPersonalityCard personality={chessPersonality} />
 
       {/* 4. Statistics Breakdown */}
       <div style={{ marginBottom: '2.5rem' }}>

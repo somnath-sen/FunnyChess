@@ -96,6 +96,7 @@ export const HackPanel: React.FC<HackPanelProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '1.25rem',
+        animation: 'fadeIn 0.25s ease',
       }}
     >
       {/* Top Header */}

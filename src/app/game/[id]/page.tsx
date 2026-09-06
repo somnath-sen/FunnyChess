@@ -986,14 +986,17 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.4rem',
-              padding: '0.55rem 1rem',
+              padding: '0.55rem 0.85rem',
+              minWidth: '130px',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: hackEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: hackEnabled ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.05)',
               border: `1px solid ${hackEnabled ? 'var(--accent-gold)' : 'var(--border-subtle)'}`,
               color: hackEnabled ? 'var(--accent-gold)' : 'var(--text-secondary)',
               fontSize: '0.85rem',
               fontWeight: 700,
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
           >
             <BrainCircuit size={16} />
@@ -1185,9 +1188,64 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
               </div>
             )}
           </div>
+
+          {/* Action Game Controls - Anchored under player strip */}
+          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: isGameOver ? '1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
+            {isGameOver ? (
+              <>
+                <button
+                  onClick={handleRematch}
+                  className="btn-primary"
+                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
+                >
+                  <RotateCcw size={16} />
+                  <span>🔄 Rematch</span>
+                </button>
+                <button
+                  onClick={() => router.push('/play/friend')}
+                  className="btn-secondary"
+                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
+                >
+                  <span>New Room</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleOfferDraw}
+                  className="btn-secondary"
+                  style={{ padding: '0.75rem', fontSize: '0.9rem' }}
+                >
+                  <Handshake size={16} />
+                  <span>Offer Draw</span>
+                </button>
+
+                <button
+                  onClick={handleResign}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#f87171',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Flag size={16} />
+                  <span>Resign</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Right Arena: Commentary, History & Game Controls */}
+        {/* Right Arena: Commentary, HACK Panel & History */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Funny Friend Chat Dialogue Bubble */}
           <div
@@ -1305,63 +1363,9 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
               </div>
             )}
           </div>
-
-          {/* Action Game Controls */}
-          <div style={{ display: 'grid', gridTemplateColumns: isGameOver ? '1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
-            {isGameOver ? (
-              <>
-                <button
-                  onClick={handleRematch}
-                  className="btn-primary"
-                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
-                >
-                  <RotateCcw size={16} />
-                  <span>🔄 Rematch</span>
-                </button>
-                <button
-                  onClick={() => router.push('/play/friend')}
-                  className="btn-secondary"
-                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
-                >
-                  <span>New Room</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={handleOfferDraw}
-                  className="btn-secondary"
-                  style={{ padding: '0.75rem', fontSize: '0.9rem' }}
-                >
-                  <Handshake size={16} />
-                  <span>Offer Draw</span>
-                </button>
-
-                <button
-                  onClick={handleResign}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-full)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                    border: '1px solid rgba(239, 68, 68, 0.35)',
-                    color: '#f87171',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Flag size={16} />
-                  <span>Resign</span>
-                </button>
-              </>
-            )}
-          </div>
         </div>
       </div>
+
 
       {/* Voice Control Modal */}
       <VoiceControlWidget

@@ -442,15 +442,17 @@ export const Chessboard: React.FC<ChessboardProps> = ({
         border: '1px solid rgba(255, 255, 255, 0.12)',
         boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 0, 0, 0.4)',
         maxWidth: '100%',
+        touchAction: 'none',
       }}
     >
       <div
         style={{
-          width: 'min(86vw, 460px)',
+          width: 'min(calc(100vw - 36px), 460px)',
           aspectRatio: '1',
           borderRadius: '10px',
           overflow: 'hidden',
           position: 'relative',
+          touchAction: 'none',
         }}
       >
         {/* Layer 1: Squares Grid (64 Squares) */}
@@ -463,6 +465,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
             height: '100%',
             position: 'absolute',
             inset: 0,
+            touchAction: 'none',
           }}
         >
           {displayRanks.map((rank, rankIndex) =>
