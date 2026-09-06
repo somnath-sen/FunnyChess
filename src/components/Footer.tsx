@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/context/LanguageContext';
 import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram } from 'lucide-react';
+import { APP_VERSION_LABEL, APP_STAGE } from '@/lib/version';
 
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
@@ -85,6 +86,22 @@ export const Footer: React.FC = () => {
                 }}
               >
                 FunnyChess
+              </span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  padding: '0.12rem 0.45rem',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                  color: 'var(--accent-gold)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  letterSpacing: '0.03em',
+                  fontFamily: 'var(--font-mono, monospace)',
+                }}
+                title={`FunnyChess ${APP_VERSION_LABEL} (${APP_STAGE})`}
+              >
+                {APP_VERSION_LABEL}
               </span>
             </div>
             <p
@@ -202,8 +219,38 @@ export const Footer: React.FC = () => {
             color: 'var(--text-muted)',
           }}
         >
-          <div>
-            © {new Date().getFullYear()} FunnyChess. FunnyChess is created by Somnath Sen with passion & ₹0 initial budget.
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+            <span>
+              © {new Date().getFullYear()} FunnyChess. FunnyChess is created by Somnath Sen with passion & ₹0 initial budget.
+            </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.72rem',
+                fontFamily: 'var(--font-mono, monospace)',
+                color: 'var(--text-secondary)',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid var(--border-subtle)',
+                padding: '0.12rem 0.55rem',
+                borderRadius: '9999px',
+                letterSpacing: '0.02em',
+              }}
+              title={`FunnyChess ${APP_VERSION_LABEL} (${APP_STAGE})`}
+            >
+              <span
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  boxShadow: '0 0 6px rgba(16, 185, 129, 0.6)',
+                }}
+              />
+              <span>{APP_VERSION_LABEL}</span>
+              <span style={{ opacity: 0.6, fontSize: '0.65rem' }}>• {APP_STAGE}</span>
+            </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>
