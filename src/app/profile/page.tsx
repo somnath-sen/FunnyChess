@@ -14,6 +14,7 @@ import {
 } from '@/lib/gamification/gamificationService';
 import { GameReplayModal } from '@/components/Profile/GameReplayModal';
 import { ChessPersonalityCard } from '@/components/Profile/ChessPersonalityCard';
+import { DailyChallengeTracker } from '@/components/Profile/DailyChallengeTracker';
 import { calculateChessPersonality } from '@/lib/chess/personalityEngine';
 import { VoiceControlWidget } from '@/components/Voice/VoiceControlWidget';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -368,6 +369,9 @@ function ProfileContent() {
 
       {/* 3B. Chess Personality Spotlight (Phase 10) */}
       <ChessPersonalityCard personality={chessPersonality} />
+
+      {/* 3C. Daily Chess Challenge & Streak Tracker */}
+      <DailyChallengeTracker />
 
       {/* 4. Statistics Breakdown */}
       <div style={{ marginBottom: '2.5rem' }}>

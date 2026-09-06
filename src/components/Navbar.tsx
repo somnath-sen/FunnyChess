@@ -17,7 +17,8 @@ import {
   Menu, 
   X, 
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Swords
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -35,6 +36,15 @@ export const Navbar: React.FC = () => {
     { href: '/learn', label: t('nav.learn', 'Learn Chess'), icon: BookOpen },
     { href: '/play/ai', label: t('nav.playAi', 'Play AI'), icon: Bot },
     { href: '/play/friend', label: t('nav.playFriend', 'Play Friend'), icon: Users },
+    ...(isAuthenticated
+      ? [
+          {
+            href: '/daily',
+            label: t('nav.dailyChallenge', 'Daily Challenge'),
+            icon: Swords,
+          },
+        ]
+      : []),
     { href: '/profile', label: t('nav.profile', 'Profile'), icon: User },
   ];
 

@@ -22,6 +22,11 @@ export const DailyChallengeSection: React.FC = () => {
     }
   };
 
+  // Only show Daily Challenge section on Home page for logged-in users
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <section
       style={{

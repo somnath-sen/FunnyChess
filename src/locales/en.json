@@ -7,6 +7,7 @@
     "playAi": "Play AI",
     "playFriend": "Play Friend",
     "profile": "Profile",
+    "dailyChallenge": "Daily Challenge",
     "signIn": "Sign In",
     "guestPlayer": "Guest Player",
     "signOut": "Sign Out"
@@ -238,7 +239,9 @@
     "alreadyCompleted": "Today's Challenge Completed! 🎉",
     "alreadyCompletedDesc": "You’ve already mastered today’s puzzle and collected +25 XP. Come back tomorrow for a brand new challenge!",
     "signInToSave": "Sign in to save your daily streak and claim +25 XP!",
-    "signInToPlay": "Sign In to Play"
+    "signInToPlay": "Sign In to Play",
+    "trackerTitle": "Daily Challenge & Streak",
+    "trackerDesc": "Solve one handpicked tactical puzzle every day to keep your streak alive and earn +25 XP."
   }
 }
 

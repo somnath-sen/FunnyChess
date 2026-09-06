@@ -71,6 +71,26 @@ interface AuthContextType {
     puzzleId: string,
     dateStr: string
   ) => Promise<{ success: boolean; xpAwarded: number; alreadyCompleted: boolean }>;
+  getDailyChallengeHistory: () => Promise<{
+    records: DailyChallengeRecord[];
+    stats: DailyChallengeStats;
+  }>;
+}
+
+export interface DailyChallengeRecord {
+  id: string;
+  challenge_date: string;
+  puzzle_id: string;
+  xp_awarded: number;
+  completed_at: string;
+}
+
+export interface DailyChallengeStats {
+  currentStreak: number;
+  longestStreak: number;
+  totalCompleted: number;
+  totalXp: number;
+  completedDates: string[];
 }
 
 /**
@@ -823,6 +843,137 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, xpAwarded: 25, alreadyCompleted: false };
   };
 
+  // Get complete daily challenge history and calculated streak statistics
+  const getDailyChallengeHistory = async (): Promise<{
+    records: DailyChallengeRecord[];
+    stats: DailyChallengeStats;
+  }> => {
+    if (!user) {
+      return {
+        records: [],
+        stats: {
+          currentStreak: 0,
+          longestStreak: 0,
+          totalCompleted: 0,
+          totalXp: 0,
+          completedDates: [],
+        },
+      };
+    }
+
+    let records: DailyChallengeRecord[] = [];
+
+    const supabase = getSupabase();
+    if (supabase && !user.isGuest) {
+      try {
+        const { data, error } = await supabase
+          .from('daily_challenge_completions')
+          .select('id, challenge_date, puzzle_id, xp_awarded, completed_at')
+          .eq('user_id', user.id)
+          .order('challenge_date', { ascending: false });
+
+        if (data && !error) {
+          records = data as DailyChallengeRecord[];
+        }
+      } catch (err) {
+        console.warn('[AuthContext] error fetching daily challenge history from Supabase:', err);
+      }
+    } else {
+      // Local fallback for guests
+      if (typeof window !== 'undefined') {
+        const now = new Date();
+        for (let i = 0; i < 60; i++) {
+          const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+          const dateStr = d.toISOString().split('T')[0];
+          if (localStorage.getItem(`funnychess_daily_${dateStr}`) === 'completed') {
+            records.push({
+              id: `local_${dateStr}`,
+              challenge_date: dateStr,
+              puzzle_id: 'puzzle_' + dateStr,
+              xp_awarded: 25,
+              completed_at: d.toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    // Compute streak stats
+    const completedDates = records.map((r) => r.challenge_date);
+    const dateSet = new Set(completedDates);
+
+    const nowUtc = new Date();
+    const todayStr = `${nowUtc.getUTCFullYear()}-${String(nowUtc.getUTCMonth() + 1).padStart(2, '0')}-${String(nowUtc.getUTCDate()).padStart(2, '0')}`;
+    const yestDate = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate() - 1));
+    const yestStr = `${yestDate.getUTCFullYear()}-${String(yestDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yestDate.getUTCDate()).padStart(2, '0')}`;
+
+    let currentStreak = 0;
+    let checkDate = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate()));
+
+    if (dateSet.has(todayStr)) {
+      while (true) {
+        const dStr = checkDate.toISOString().split('T')[0];
+        if (dateSet.has(dStr)) {
+          currentStreak++;
+          checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        } else {
+          break;
+        }
+      }
+    } else if (dateSet.has(yestStr)) {
+      checkDate = yestDate;
+      while (true) {
+        const dStr = checkDate.toISOString().split('T')[0];
+        if (dateSet.has(dStr)) {
+          currentStreak++;
+          checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Longest streak
+    const sortedUniqueDates = Array.from(dateSet).sort();
+    let longestStreak = 0;
+    let tempStreak = 0;
+    let prevTime: number | null = null;
+
+    for (const dStr of sortedUniqueDates) {
+      const parts = dStr.split('-').map(Number);
+      const currTime = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+      if (prevTime === null) {
+        tempStreak = 1;
+      } else {
+        const diffDays = Math.round((currTime - prevTime) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else if (diffDays > 1) {
+          tempStreak = 1;
+        }
+      }
+      prevTime = currTime;
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+    }
+
+    longestStreak = Math.max(longestStreak, currentStreak);
+    const totalCompleted = records.length;
+    const totalXp = records.reduce((sum, r) => sum + (r.xp_awarded || 25), 0);
+
+    return {
+      records,
+      stats: {
+        currentStreak,
+        longestStreak,
+        totalCompleted,
+        totalXp,
+        completedDates,
+      },
+    };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -846,6 +997,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dismissFirstTimeModal,
         checkDailyChallengeCompleted,
         completeDailyChallenge,
+        getDailyChallengeHistory,
       }}
     >
       {children}
