@@ -1061,13 +1061,16 @@ function PlayAIContent() {
         onClose={() => setIsSetupOpen(false)}
       />
 
-      {/* GameOverModal */}
+      {/* GameOverModal / Phase 12 PostGameModal */}
       <GameOverModal
         isOpen={isGameOverOpen}
         result={gameResult}
         reason={gameOverReason}
         movesCount={moveHistory.length}
+        moveHistory={moveHistory}
+        playerColor={playerColor}
         difficulty={difficulty}
+        personalityId={personality}
         onRematch={() => {
           startNewGame({
             difficulty,

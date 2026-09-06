@@ -8,6 +8,7 @@ import { gameService, MultiplayerGame, PlayerRole } from '@/lib/multiplayer/game
 import { getFriendComment, FriendGameEvent } from '@/lib/chess/friendComments';
 import { useSpeech } from '@/hooks/useSpeech';
 import { VoiceControlWidget } from '@/components/Voice/VoiceControlWidget';
+import { PostGameModal } from '@/components/PostGame/PostGameModal';
 import { HackPanel } from '@/components/HackMode/HackPanel';
 import { analyzePosition, HackAnalysis } from '@/lib/chess/hackEngine';
 import { sounds } from '@/lib/audio/soundEffects';
@@ -80,6 +81,7 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [opponentJustJoined, setOpponentJustJoined] = useState(false);
+  const [isPostGameOpen, setIsPostGameOpen] = useState(false);
   // HACK Mode State
   const [hackEnabled, setHackEnabled] = useState(false);
   const [hackAnalysis, setHackAnalysis] = useState<HackAnalysis | null>(null);
@@ -273,6 +275,9 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
           } else {
             triggerCommentRef.current('checkmate_friend_wins', 'high');
           }
+          setTimeout(() => {
+            setIsPostGameOpen(true);
+          }, 1200);
         }
       } else if (event === 'game_resigned') {
         if (meta?.resignedBy !== myRoleRef.current) {
@@ -281,11 +286,17 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
         } else {
           triggerCommentRef.current('resigned', 'high');
         }
+        setTimeout(() => {
+          setIsPostGameOpen(true);
+        }, 1200);
       } else if (event === 'draw_offered' && meta?.offeredBy !== myRoleRef.current) {
         setDrawOfferPending(true);
       } else if (event === 'draw_accepted') {
         triggerCommentRef.current('draw', 'high');
         setDrawOfferPending(false);
+        setTimeout(() => {
+          setIsPostGameOpen(true);
+        }, 1200);
       }
     });
 
@@ -352,6 +363,9 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
       const updated = await gameService.resign(game.id, myRole);
       setGame(updated);
       triggerComment('resigned', 'high');
+      setTimeout(() => {
+        setIsPostGameOpen(true);
+      }, 1000);
     }
   };
 
@@ -369,6 +383,9 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
     setGame(updated);
     setDrawOfferPending(false);
     triggerComment('draw', 'high');
+    setTimeout(() => {
+      setIsPostGameOpen(true);
+    }, 1000);
   };
 
   // Rematch
@@ -1190,24 +1207,46 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
           </div>
 
           {/* Action Game Controls - Anchored under player strip */}
-          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: isGameOver ? '1fr 1fr' : '1fr 1fr', gap: '0.75rem' }}>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
             {isGameOver ? (
               <>
                 <button
-                  onClick={handleRematch}
+                  onClick={() => setIsPostGameOpen(true)}
                   className="btn-primary"
-                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
+                  style={{
+                    padding: '0.85rem',
+                    fontSize: '0.95rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)',
+                    cursor: 'pointer',
+                  }}
                 >
-                  <RotateCcw size={16} />
-                  <span>🔄 Rematch</span>
+                  <Sparkles size={18} />
+                  <span style={{ fontWeight: 800 }}>📊 View Post-Game Analysis</span>
                 </button>
-                <button
-                  onClick={() => router.push('/play/friend')}
-                  className="btn-secondary"
-                  style={{ padding: '0.8rem', fontSize: '0.95rem' }}
-                >
-                  <span>New Room</span>
-                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <button
+                    onClick={handleRematch}
+                    className="btn-secondary"
+                    style={{ padding: '0.8rem', fontSize: '0.95rem' }}
+                  >
+                    <RotateCcw size={16} />
+                    <span>🔄 Rematch</span>
+                  </button>
+                  <button
+                    onClick={() => router.push('/play/friend')}
+                    className="btn-secondary"
+                    style={{ padding: '0.8rem', fontSize: '0.95rem' }}
+                  >
+                    <span>New Room</span>
+                  </button>
+                </div>
               </>
             ) : (
               <>
@@ -1366,6 +1405,26 @@ function MultiplayerGameContent({ gameId }: { gameId: string }) {
         </div>
       </div>
 
+
+      {/* Phase 12 Post-Game Analysis & Funny Moments Modal */}
+      {game && (
+        <PostGameModal
+          isOpen={isPostGameOpen}
+          onClose={() => setIsPostGameOpen(false)}
+          result={
+            game.winner === myRole
+              ? 'win'
+              : game.winner === 'draw'
+              ? 'draw'
+              : 'loss'
+          }
+          playerColor={myRole === 'black' ? 'black' : 'white'}
+          opponentName={opponentName || 'Friend'}
+          moveHistory={game.move_history || []}
+          isMultiplayer={true}
+          onRematch={handleRematch}
+        />
+      )}
 
       {/* Voice Control Modal */}
       <VoiceControlWidget
