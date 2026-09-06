@@ -242,6 +242,66 @@
     "signInToPlay": "चुनौती खेलने के लिए साइन इन करें",
     "trackerTitle": "दैनिक चुनौती और स्ट्रीक",
     "trackerDesc": "अपनी स्ट्रीक बनाए रखने और +25 XP अर्जित करने के लिए प्रतिदिन एक सामरिक पहेली हल करें।"
+  },
+  "common": {
+    "easy": "सरल",
+    "intermediate": "मध्यम",
+    "hard": "कठिन",
+    "yourTurn": "आपकी बारी ♟️",
+    "thinking": "सोच रहा हूँ... 💭",
+    "check": "चेक!",
+    "checkmate": "चेकमेट! 👑",
+    "goodGame": "शानदार खेल!",
+    "rematch": "दोबारा खेलें",
+    "wellPlayed": "खूब खेले",
+    "aiWins": "AI जीता",
+    "youWin": "आप जीते!",
+    "draw": "ड्रॉ मैच"
+  },
+  "aiPersonality": {
+    "label": "AI पर्सनैलिटी",
+    "independentNote": "शतरंज के स्तर पर असर नहीं पड़ता",
+    "chillName": "चिल बॉट",
+    "chillDesc": "शांत, दोस्ताना और मजेदार बातें",
+    "chillThinking": "सोच रहा हूँ... 😎",
+    "professorName": "प्रोफ़ेसर",
+    "professorDesc": "बुद्धिमान, शांत और विश्लेषणात्मक बातें",
+    "professorThinking": "स्थिति का विश्लेषण कर रहा हूँ...",
+    "trollName": "ट्रोल बॉट",
+    "trollDesc": "मजाकिया, चिढ़ाने वाला और चुलबुला",
+    "trollThinking": "ज़रा सोचने दीजिए... 😏",
+    "competitiveName": "कॉम्पिटिटिव बॉट",
+    "competitiveDesc": "आत्मविश्वासी, ऊर्जावान और जुझारू",
+    "competitiveThinking": "अगली चाल की गणना कर रहा हूँ...",
+    "grandmasterName": "ग्रैंडमास्टर",
+    "grandmasterDesc": "गंभीर, संक्षिप्त और सुलझे हुए विचार",
+    "grandmasterThinking": "विचार कर रहा हूँ..."
+  },
+  "aiEmotion": {
+    "neutral": "एकाग्र",
+    "confident": "आत्मविश्वासी",
+    "surprised": "हैरान",
+    "pressured": "दबाव में",
+    "frustrated": "परेशान",
+    "celebrating": "विजयी"
+  },
+  "playAi": {
+    "title": "AI के साथ खेलें",
+    "setupTitle": "अपना AI प्रतिद्वंद्वी चुनें",
+    "setupSubtitle": "कठिनाई, मोहरों का रंग और बॉट की पर्सनैलिटी चुनें!",
+    "difficultyLabel": "इंजन की कठिनाई",
+    "playAsLabel": "मोहरे चुनें",
+    "startMatch": "मुकाबला शुरू करें",
+    "activeGame": "चालू खेल",
+    "opponent": "प्रतिद्वंद्वी",
+    "playingAs": "खेल रहे हैं",
+    "newMatch": "नया मैच",
+    "offerDraw": "ड्रॉ का प्रस्ताव",
+    "resign": "हार मानें",
+    "voiceOn": "आवाज़ चालू",
+    "muted": "मौन",
+    "hackActive": "HACK सक्रिय",
+    "hackOff": "HACK बंद"
   }
 }
 

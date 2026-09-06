@@ -242,6 +242,66 @@
     "signInToPlay": "Sign In to Play",
     "trackerTitle": "Daily Challenge & Streak",
     "trackerDesc": "Solve one handpicked tactical puzzle every day to keep your streak alive and earn +25 XP."
+  },
+  "common": {
+    "easy": "Easy",
+    "intermediate": "Intermediate",
+    "hard": "Hard",
+    "yourTurn": "Your Turn ♟️",
+    "thinking": "Thinking... 💭",
+    "check": "Check!",
+    "checkmate": "Checkmate! 👑",
+    "goodGame": "Good Game!",
+    "rematch": "Rematch",
+    "wellPlayed": "Well Played",
+    "aiWins": "AI Wins",
+    "youWin": "You Win!",
+    "draw": "Draw Game"
+  },
+  "aiPersonality": {
+    "label": "AI Personality",
+    "independentNote": "Does not affect chess difficulty",
+    "chillName": "Chill Bot",
+    "chillDesc": "Relaxed, friendly & playful banter",
+    "chillThinking": "Thinking... 😎",
+    "professorName": "Professor",
+    "professorDesc": "Intelligent, calm & analytical commentary",
+    "professorThinking": "Analyzing the position...",
+    "trollName": "Troll Bot",
+    "trollDesc": "Mischievous, teasing & playful jokes",
+    "trollThinking": "Let me think about this... 😏",
+    "competitiveName": "Competitive Bot",
+    "competitiveDesc": "Confident, energetic & fiercely competitive",
+    "competitiveThinking": "Calculating your downfall...",
+    "grandmasterName": "Grandmaster",
+    "grandmasterDesc": "Elegant, minimal & composed wisdom",
+    "grandmasterThinking": "Considering..."
+  },
+  "aiEmotion": {
+    "neutral": "Focused",
+    "confident": "Confident",
+    "surprised": "Surprised",
+    "pressured": "Pressured",
+    "frustrated": "Tilted",
+    "celebrating": "Victorious"
+  },
+  "playAi": {
+    "title": "Play With AI",
+    "setupTitle": "Choose Your AI Opponent",
+    "setupSubtitle": "Pick your difficulty, playing color, and AI personality!",
+    "difficultyLabel": "Engine Difficulty",
+    "playAsLabel": "Play As",
+    "startMatch": "Start Chess Match",
+    "activeGame": "Active Game",
+    "opponent": "Opponent",
+    "playingAs": "Playing as",
+    "newMatch": "New Match",
+    "offerDraw": "Offer Draw",
+    "resign": "Resign",
+    "voiceOn": "Voice ON",
+    "muted": "Muted",
+    "hackActive": "HACK ACTIVE",
+    "hackOff": "HACK OFF"
   }
 }
 

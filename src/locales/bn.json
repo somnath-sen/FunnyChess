@@ -242,6 +242,66 @@
     "signInToPlay": "চ্যালেঞ্জ খেলতে সাইন ইন করুন",
     "trackerTitle": "দৈনিক চ্যালেঞ্জ ও স্ট্রিক",
     "trackerDesc": "আপনার স্ট্রিক বজায় রাখতে এবং +২৫ XP অর্জন করতে প্রতিদিন একটি কৌশলগত পাজল সমাধান করুন।"
+  },
+  "common": {
+    "easy": "সহজ",
+    "intermediate": "মাঝারি",
+    "hard": "কঠিন",
+    "yourTurn": "আপনার চাল ♟️",
+    "thinking": "ভাবছি... 💭",
+    "check": "কিস্তি!",
+    "checkmate": "কিস্তিমাত! 👑",
+    "goodGame": "দারুণ খেলা হলো!",
+    "rematch": "পুনরায় খেলুন",
+    "wellPlayed": "চমৎকার খেলেছেন",
+    "aiWins": "AI জিতেছে",
+    "youWin": "আপনি জিতেছেন!",
+    "draw": "ড্র খেলা"
+  },
+  "aiPersonality": {
+    "label": "AI ব্যক্তিত্ব",
+    "independentNote": "দাবার শক্তিমত্তার ওপর কোনো প্রভাব ফেলে না",
+    "chillName": "চিল বট",
+    "chillDesc": "শান্ত, বন্ধুত্বপূর্ণ ও মজার মেজাজ",
+    "chillThinking": "ভাবছি একটু... 😎",
+    "professorName": "প্রফেসর",
+    "professorDesc": "বুদ্ধিদীপ্ত, শান্ত ও গভীর বিশ্লেষণ",
+    "professorThinking": "পজিশন বিশ্লেষণ করছি...",
+    "trollName": "ট্রোল বট",
+    "trollDesc": "দুষ্টুমিভরা, খোঁচা দেওয়া মজার তামাশা",
+    "trollThinking": "দাঁড়ান একটু ভেবে নিই... 😏",
+    "competitiveName": "কম্পিটিটিভ বট",
+    "competitiveDesc": "আত্মবিশ্বাসী, উদ্যমী ও লড়াকু",
+    "competitiveThinking": "পরের চাল হিসেব করছি...",
+    "grandmasterName": "গ্র্যান্ডমাস্টার",
+    "grandmasterDesc": "মার্জিত, স্বল্পভাষী ও অভিজ্ঞ দৃষ্টিভঙ্গি",
+    "grandmasterThinking": "বিবেচনা করছি..."
+  },
+  "aiEmotion": {
+    "neutral": "মনোযোগী",
+    "confident": "আত্মবিশ্বাসী",
+    "surprised": "চমকিত",
+    "pressured": "চাপে পড়া",
+    "frustrated": "বিরক্ত",
+    "celebrating": "বিজয়ী"
+  },
+  "playAi": {
+    "title": "AI এর সাথে খেলুন",
+    "setupTitle": "আপনার AI প্রতিদ্বন্দ্বী বেছে নিন",
+    "setupSubtitle": "কাঠিন্য, ঘুঁটির রঙ এবং AI ব্যক্তিত্ব বেছে নিন!",
+    "difficultyLabel": "ইঞ্জিনের কাঠিন্য",
+    "playAsLabel": "ঘুঁটি বেছে নিন",
+    "startMatch": "ম্যাচ শুরু করুন",
+    "activeGame": "চলমান ম্যাচ",
+    "opponent": "প্রতিপক্ষ",
+    "playingAs": "খেলছেন",
+    "newMatch": "নতুন ম্যাচ",
+    "offerDraw": "ড্রয়ের প্রস্তাব",
+    "resign": "আত্মসমর্পণ",
+    "voiceOn": "কণ্ঠ চালু",
+    "muted": "নিঃশব্দ",
+    "hackActive": "HACK সক্রিয়",
+    "hackOff": "HACK বন্ধ"
   }
 }
 
