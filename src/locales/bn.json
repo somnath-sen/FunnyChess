@@ -140,7 +140,11 @@
   "footer": {
     "tagline": "দাবা কিন্তু মোটেই কঠিন নয়। আপনি শুধু এখনও মজার উপায়ে শেখেননি।",
     "quote": "“আমি শিক্ষার স্বার্থে নিজের রানি উৎসর্গ করেছিলাম।”",
-    "madeWith": "Made with ❤️ Somnath Sen"
+    "madeWith": "Made with ❤️ Somnath Sen",
+    "liveCommunity": "লাইভ কমিউনিটি",
+    "registeredPlayers": "নিবন্ধিত দাবা অ্যাকাউন্ট",
+    "loadingCommunity": "সক্রিয় দাবা সম্প্রদায়",
+    "verifiedDb": "Supabase দ্বারা রিয়েল-টাইমে যাচাইকৃত"
   },
   "multiplayerAuth": {
     "signInToPlay": "বন্ধুর সাথে খেলতে সাইন ইন করুন",

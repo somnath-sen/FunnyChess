@@ -140,7 +140,11 @@
   "footer": {
     "tagline": "शतरंज बिल्कुल कठिन नहीं है। बस आपने इसे अभी तक मजेदार तरीके से नहीं सीखा है।",
     "quote": "“मैंने अपनी रानी शिक्षा के उद्देश्य से कुर्बान की थी।”",
-    "madeWith": "Made with ❤️ Somnath Sen"
+    "madeWith": "Made with ❤️ Somnath Sen",
+    "liveCommunity": "लाइव समुदाय",
+    "registeredPlayers": "पंजीकृत शतरंज खाते",
+    "loadingCommunity": "सक्रिय शतरंज समुदाय",
+    "verifiedDb": "Supabase द्वारा रीयल-टाइम सत्यापित"
   },
   "multiplayerAuth": {
     "signInToPlay": "दोस्त के साथ खेलने के लिए साइन इन करें",

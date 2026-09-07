@@ -1,13 +1,37 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/context/LanguageContext';
-import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram } from 'lucide-react';
+import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram, Users } from 'lucide-react';
 import { APP_VERSION_LABEL, APP_STAGE } from '@/lib/version';
+import { getSupabase } from '@/lib/supabase/client';
 
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchLivePlayerStats() {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { count, error } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+        if (!error && count !== null && mounted) {
+          setPlayerCount(count);
+        }
+      } catch {
+        // graceful offline fallback
+      }
+    }
+    fetchLivePlayerStats();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <footer
@@ -201,6 +225,65 @@ export const Footer: React.FC = () => {
             >
               <ShieldCheck size={14} />
               <span>Zero Paywalls • Free to Play</span>
+            </div>
+
+            {/* Live Verified Community Statistics */}
+            <div
+              style={{
+                marginTop: '1.25rem',
+                padding: '0.85rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.74rem',
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.8)',
+                    display: 'inline-block',
+                  }}
+                />
+                <span>{t('footer.liveCommunity', 'Live Community')}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                }}
+              >
+                <Users size={16} color="var(--accent-gold)" />
+                <span>
+                  {playerCount !== null
+                    ? `${playerCount} ${t('footer.registeredPlayers', 'Registered Chess Accounts')}`
+                    : t('footer.loadingCommunity', 'Active Chess Community')}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {t('footer.verifiedDb', 'Real-time verified via Supabase')}
+              </div>
             </div>
           </div>
         </div>
