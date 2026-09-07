@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/context/LanguageContext';
 import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram, Users } from 'lucide-react';
-import { APP_VERSION_LABEL, APP_STAGE } from '@/lib/version';
+import { APP_VERSION_LABEL, APP_STAGE, APP_COMMIT } from '@/lib/version';
 import { getSupabase } from '@/lib/supabase/client';
 
 export const Footer: React.FC = () => {
@@ -123,7 +123,7 @@ export const Footer: React.FC = () => {
                   letterSpacing: '0.03em',
                   fontFamily: 'var(--font-mono, monospace)',
                 }}
-                title={`FunnyChess ${APP_VERSION_LABEL} (${APP_STAGE})`}
+                title={`FunnyChess ${APP_VERSION_LABEL} (${APP_STAGE}) • Commit: ${APP_COMMIT}`}
               >
                 {APP_VERSION_LABEL}
               </span>

@@ -1,12 +1,15 @@
 {
   "name": "funnychess",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
+    "predev": "node scripts/update-version.js",
     "dev": "next dev",
+    "prebuild": "node scripts/update-version.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "version:bump": "node scripts/update-version.js --bump"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",
