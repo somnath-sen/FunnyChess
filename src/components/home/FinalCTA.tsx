@@ -65,7 +65,7 @@ export const FinalCTA: React.FC = () => {
     },
     {
       id: 'friend',
-      badge: t('finalCta.card3Badge', '🔥 Instant 1-Click Duel'),
+      badge: t('finalCta.card3Badge', '🔥 Private Online Duel'),
       badgeBg: 'rgba(139, 92, 246, 0.15)',
       badgeColor: '#c084fc',
       badgeBorder: 'rgba(139, 92, 246, 0.3)',

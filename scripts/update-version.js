@@ -63,10 +63,10 @@ try {
   isDirty = statusStr.length > 0;
 } catch (e) {}
 
-// Determine current build number (git commit count + uncommitted offset, or auto-incrementing counter)
-let currentBuild = meta.build || 22;
+// Determine current build number (handling shallow clones on CI/Vercel)
+let currentBuild = meta.build || 23;
 if (gitCommitCount !== null) {
-  currentBuild = gitCommitCount + (isDirty ? 1 : 0);
+  currentBuild = Math.max(currentBuild, gitCommitCount + (isDirty ? 1 : 0));
 } else {
   currentBuild += 1;
 }

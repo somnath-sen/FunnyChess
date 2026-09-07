@@ -67,7 +67,7 @@ npm install
 ```
 
 ### 3. Environment Variables (Optional)
-FunnyChess is built **Free-Tier First**. If no environment variables are provided, the application automatically runs in a zero-friction **Guest / Local Demo Mode** without requiring database setup.
+FunnyChess is built **Free-Tier First**. If no environment variables are provided, the application automatically runs in **Local Demo Mode** without requiring database setup.
 
 To enable Supabase cloud authentication, multiplayer persistence, and profile sync:
 

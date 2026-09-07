@@ -35,8 +35,8 @@ export const FriendPlaySection: React.FC = () => {
               <span>{t('friendShowcase.badge', 'Realtime Multiplayer')}</span>
             </div>
 
-            <h2 style={{ fontSize: 'clamp(2.1rem, 3.5vw, 2.9rem)', fontWeight: 800, marginBottom: '1rem', lineHeight: 1.2 }}>
-              {t('friendShowcase.title', 'Challenge Your Friends in 1 Click 👥♟️')}
+            <h2 style={{ fontSize: 'clamp(2.2rem, 4vw, 3.4rem)', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: '1.25rem', color: '#ffffff' }}>
+              {t('friendShowcase.title', 'Challenge Your Friends Online 👥♟️')}
             </h2>
 
             <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: 1.65, marginBottom: '2rem' }}>
