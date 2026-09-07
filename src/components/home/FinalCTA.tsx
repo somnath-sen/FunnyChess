@@ -73,7 +73,7 @@ export const FinalCTA: React.FC = () => {
       title: t('finalCta.card3Title', 'Challenge a Friend'),
       desc: t(
         'finalCta.card3Desc',
-        'Generate a room link, send via WhatsApp, and duel in real time with zero sign-up friction.'
+        'Create a game room, share your invite link, and duel friends online in real time.'
       ),
       btnText: t('finalCta.card3Btn', 'Play with Friend'),
       btnClass: 'btn-secondary',
@@ -82,7 +82,7 @@ export const FinalCTA: React.FC = () => {
       borderGlow: 'rgba(139, 92, 246, 0.35)',
       cardBg: 'linear-gradient(180deg, rgba(26, 20, 38, 0.85) 0%, rgba(18, 22, 34, 0.95) 100%)',
       btnIcon: Users,
-      features: ['1-click WhatsApp invite', 'Zero sign-up for friends', 'Real-time legal moves'],
+      features: ['Easy WhatsApp invite', 'Private game rooms', 'Real-time legal moves'],
       isFeatured: false,
     },
   ];
@@ -408,7 +408,7 @@ export const FinalCTA: React.FC = () => {
           <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
             {t(
               'finalCta.trust',
-              'Join 1,000+ players who learned their first checkmate here today ♟️'
+              'Learn chess. Play. Improve. Have fun ♟️'
             )}
           </span>
         </div>

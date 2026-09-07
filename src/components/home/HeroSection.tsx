@@ -298,7 +298,7 @@ export const HeroSection: React.FC = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CheckCircle2 size={17} color="var(--accent-emerald)" />
-              <span>{t('hero.statsEngine', 'Stockfish Client-Side Engine')}</span>
+              <span>{t('hero.statsEngine', 'Smart Browser-Based AI')}</span>
             </div>
           </div>
         </div>

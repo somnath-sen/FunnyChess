@@ -183,7 +183,7 @@ export const Footer: React.FC = () => {
                 marginBottom: '1rem',
               }}
             >
-              FunnyChess is built with ₹0 initial budget using 100% open-source technologies (Stockfish WASM, Chess.js, browser Web Speech API, and Supabase free tier).
+              FunnyChess is built with ₹0 initial budget using open-source technologies (Chess.js, Stockfish.js, browser Web Speech API, and Supabase free tier).
             </p>
             <div
               style={{
@@ -200,7 +200,7 @@ export const Footer: React.FC = () => {
               }}
             >
               <ShieldCheck size={14} />
-              <span>Zero Paywalls • Zero Subscriptions</span>
+              <span>Zero Paywalls • Free to Play</span>
             </div>
           </div>
         </div>

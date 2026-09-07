@@ -42,14 +42,14 @@ export const FriendPlaySection: React.FC = () => {
             <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: 1.65, marginBottom: '2rem' }}>
               {t(
                 'friendShowcase.subtitle',
-                'Send an invitation link on WhatsApp or Discord and play instantly. Real-time move synchronization with zero latency!'
+                'Send an invitation link to a friend and play together online. Real-time move synchronization in your browser.'
               )}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '2.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#e2e8f0', fontSize: '0.94rem' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#8b5cf6' }} />
-                <span>No sign-up required for your friend — they click and play immediately!</span>
+                <span>Sign in with Google, create a private game, and invite your friend to play!</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#e2e8f0', fontSize: '0.94rem' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#8b5cf6' }} />
@@ -98,7 +98,7 @@ export const FriendPlaySection: React.FC = () => {
                   {t('friendShowcase.inviteTitle', 'Shareable Duel Link')}
                 </h3>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Room: <strong>FC-K9M2P4</strong> • Instant Join
+                  Room: <strong>FC-K9M2P4</strong> • Shareable Invite
                 </div>
               </div>
             </div>

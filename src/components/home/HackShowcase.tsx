@@ -27,7 +27,7 @@ export const HackShowcase: React.FC = () => {
           <div>
             <div className="badge badge-emerald" style={{ marginBottom: '1rem' }}>
               <BrainCircuit size={15} />
-              <span>{t('hackShowcase.badge', 'Zero-Cheating Chess Assistant')}</span>
+              <span>{t('hackShowcase.badge', 'Interactive Chess Assistant')}</span>
             </div>
 
             <h2 style={{ fontSize: 'clamp(2.1rem, 3.5vw, 2.9rem)', fontWeight: 800, marginBottom: '1rem', lineHeight: 1.2 }}>
@@ -37,7 +37,7 @@ export const HackShowcase: React.FC = () => {
             <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: 1.65, marginBottom: '1.75rem' }}>
               {t(
                 'hackShowcase.subtitle',
-                'Ever stared at a chessboard wondering: “What on earth should I move now?” HACK Mode doesn’t give you dry numbers like +1.42. It acts like a patient grandmaster coach.'
+                'Ever stared at a chessboard wondering: “What on earth should I move now?” HACK Mode doesn’t give you dry numbers like +1.42. It acts like a patient chess mentor.'
               )}
             </p>
 

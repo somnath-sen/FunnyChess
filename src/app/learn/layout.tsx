@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Learn Chess — Free Interactive Lessons & Tactics | FunnyChess',
     description:
-      'Master chess from scratch with 25 bite-sized interactive lessons, visual board puzzles, and fun quizzes. 100% free on FunnyChess.',
+      'Master chess from scratch with 25 bite-sized interactive lessons, visual board puzzles, and fun quizzes. Free to play on FunnyChess.',
     url: 'https://funny-chess-sigma.vercel.app/learn',
     type: 'website',
   },

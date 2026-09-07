@@ -371,7 +371,7 @@ function PlayFriendContent() {
           </div>
 
           <div style={{ marginTop: '1.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-            ⚡ Real-time WebSockets • Synchronized moves • Zero latency
+            ⚡ Real-time WebSockets • Synchronized moves • Live online play
           </div>
         </div>
 

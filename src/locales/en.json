@@ -22,7 +22,7 @@
     "btnPlayFriend": "Challenge a Friend",
     "statsFree": "Built Free-First ❤️",
     "statsLanguages": "3 Languages: English, Hindi, Bengali",
-    "statsEngine": "Stockfish Client-Side Engine",
+    "statsEngine": "Smart Browser-Based AI",
     "knightCardTitle": "Best Move Recommendation",
     "knightCardSubtitle": "♘ Nf3 • Controls the center",
     "speechBubble": "“Nice move! Did you see that fork coming?” — FunnyBot 😂"
@@ -38,7 +38,7 @@
     "item3Title": "AI That Speaks Aloud",
     "item3Desc": "Practice against an AI with real voice commentary in English, Hindi, and Bengali.",
     "item4Title": "1-Click Friend Duels",
-    "item4Desc": "Generate a link, send via WhatsApp, and duel in real time with zero sign-up friction.",
+    "item4Desc": "Sign in with Google, share your invite link, and duel friends online in real time.",
     "item5Title": "🧠 HACK Mode Mentor",
     "item5Desc": "Understand WHY a move is strong, spot opponent threats, and learn how to think.",
     "item6Title": "Built Free-First ❤️",
@@ -73,9 +73,9 @@
     "catQuote": "“Meow! I knocked your bishop off the board. Deal with it!” 🐱"
   },
   "hackShowcase": {
-    "badge": "Zero-Cheating Chess Assistant",
+    "badge": "Interactive Chess Assistant",
     "title": "Meet the 🧠 HACK Mode",
-    "subtitle": "Ever stared at a chessboard wondering: “What on earth should I move now?” HACK Mode doesn’t give you dry numbers like +1.42. It acts like a patient coach.",
+    "subtitle": "Ever stared at a chessboard wondering: “What on earth should I move now?” HACK Mode doesn’t give you dry numbers like +1.42. It acts like a patient chess mentor.",
     "recMove": "Recommended Move",
     "recMoveName": "♘ Nf3 (Knight to f3)",
     "whyTitle": "Why is this move good?",
@@ -89,7 +89,7 @@
   "friendShowcase": {
     "badge": "Realtime Multiplayer",
     "title": "Challenge Your Friends in 1 Click 👥♟️",
-    "subtitle": "Send an invitation link on WhatsApp or Discord and play instantly. Real-time move synchronization with zero latency!",
+    "subtitle": "Send an invitation link to a friend and play together online. Real-time move synchronization in your browser.",
     "inviteTitle": "Shareable Duel Link",
     "copy": "Copy Link",
     "copied": "Copied!",
@@ -109,7 +109,7 @@
     "tabVision": "Core Vision",
     "tabStory": "The Backstory",
     "tabAdvice": "Founder's Advice",
-    "storyText": "FunnyChess started with a blank editor, ₹0 initial budget, and a mission: why should learning chess feel like a boring exam? Using open-source technologies, client-side engines, and sheer passion, it was created so anyone can learn, laugh, and master chess completely free.",
+    "storyText": "FunnyChess started with a blank editor, ₹0 initial budget, and a mission: why should learning chess feel like a boring exam? Using open-source technologies, client-side engines, and sheer passion, it was created so anyone can learn, laugh, and master chess free to play.",
     "adviceText": "Stop worrying about memorizing 20-move opening theories. The real magic of chess is tactical play: active knights, solid king defense, and laughing off your blunders. Make your first move today!",
     "favMove": "Founder's Favorite: ♘ Nf3 — Flexible, active, and controls the center!",
     "botBanter": "“Somnath coded me to be witty, but your moves make my punchlines too easy!” 😂",
@@ -133,9 +133,9 @@
     "card2Btn": "Play with AI",
     "card3Badge": "🔥 Instant 1-Click Duel",
     "card3Title": "Challenge a Friend",
-    "card3Desc": "Generate a room link, send via WhatsApp, and duel in real time with zero sign-up friction.",
+    "card3Desc": "Create a game room, share your invite link, and duel friends online in real time.",
     "card3Btn": "Play with Friend",
-    "trust": "Join 1,000+ players who learned their first checkmate here today ♟️"
+    "trust": "Learn chess. Play. Improve. Have fun ♟️"
   },
   "footer": {
     "tagline": "Chess is not hard. You just haven’t learned it the fun way yet.",
@@ -160,7 +160,7 @@
     "roomFullDesc": "This match is already in progress between two players.",
     "invitedDuel": "invited you to a live chess duel on FunnyChess!",
     "acceptChallenge": "Accept Challenge & Play",
-    "soloAlt": "Want to play without signing in? Play with Funny AI →"
+    "soloAlt": "Prefer single player? Play with Funny AI →"
   },
   "auth": {
     "signInToContinue": "Sign in to continue",
@@ -180,7 +180,7 @@
     "subtitleJoinGame": "Sign in to join this match and play live against your friend.",
     "signInToPlayDaily": "Sign in to play Daily Challenge",
     "subtitleDaily": "Solve daily tactical puzzles, claim your +25 XP streak, and level up your chess profile.",
-    "secureFree": "Secure • 100% Free Forever • No Ads"
+    "secureFree": "Secure • Free to Play • No Ads"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to FunnyChess!",

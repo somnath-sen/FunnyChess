@@ -40,7 +40,7 @@ export const WhyFunnyChess: React.FC = () => {
     {
       icon: Users,
       title: t('why.item4Title', '1-Click Friend Duels'),
-      desc: t('why.item4Desc', 'Generate a link, send via WhatsApp, and duel in real time with zero sign-up friction.'),
+      desc: t('why.item4Desc', 'Sign in with Google, share your invite link, and duel friends online in real time.'),
       color: '#8b5cf6',
       bg: 'rgba(139, 92, 246, 0.12)',
     },

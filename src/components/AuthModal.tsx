@@ -168,7 +168,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           }}
         >
           <ShieldCheck size={14} color="var(--accent-emerald)" />
-          <span>{t('auth.freeNotice', '100% Free Forever • No Paywalls • No Ads')}</span>
+          <span>{t('auth.freeNotice', 'Free to Play • Open-Source • No Paywalls')}</span>
         </div>
       </div>
     </div>

@@ -316,7 +316,7 @@ export function ProtectedRoute({
           }}
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>{t('auth.secureFree', 'Secure • 100% Free Forever • No Ads')}</span>
+          <span>{t('auth.secureFree', 'Secure • Free to Play • No Ads')}</span>
         </div>
 
         {/* Back to Home Navigation */}
