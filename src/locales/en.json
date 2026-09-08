@@ -141,10 +141,11 @@
     "tagline": "Chess is not hard. You just haven’t learned it the fun way yet.",
     "quote": "“I sacrificed my Queen for educational purposes.”",
     "madeWith": "Made with ❤️ Somnath Sen",
-    "liveCommunity": "Live Community",
-    "registeredPlayers": "Registered Chess Accounts",
-    "loadingCommunity": "Active Chess Community",
-    "verifiedDb": "Real-time verified via Supabase"
+    "freePledgeTitle": "Our Free-First Pledge 🛡️",
+    "techDescription": "Built with Chess.js, browser-based chess analysis, Web Speech API, and Supabase.",
+    "zeroPaywalls": "Zero Paywalls • Free to Play",
+    "openArchitecture": "Open Architecture",
+    "openArchitectureDesc": "Client-first chess logic running directly in your browser. ₹0 initial budget, completely open and accessible."
   },
   "multiplayerAuth": {
     "signInToPlay": "Sign in to play with a friend",

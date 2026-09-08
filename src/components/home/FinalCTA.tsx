@@ -388,7 +388,7 @@ export const FinalCTA: React.FC = () => {
           })}
         </div>
 
-        {/* Bottom Social Proof Bar */}
+        {/* Bottom Brand Trust Pill */}
         <div
           style={{
             display: 'flex',

@@ -1,37 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/context/LanguageContext';
-import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram, Users } from 'lucide-react';
+import { Heart, ShieldCheck, Sparkles, Github, Linkedin, Instagram } from 'lucide-react';
 import { APP_VERSION_LABEL, APP_STAGE, APP_COMMIT } from '@/lib/version';
-import { getSupabase } from '@/lib/supabase/client';
 
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
-  const [playerCount, setPlayerCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    async function fetchLivePlayerStats() {
-      try {
-        const supabase = getSupabase();
-        if (!supabase) return;
-        const { count, error } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-        if (!error && count !== null && mounted) {
-          setPlayerCount(count);
-        }
-      } catch {
-        // graceful offline fallback
-      }
-    }
-    fetchLivePlayerStats();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   return (
     <footer
@@ -197,7 +173,7 @@ export const Footer: React.FC = () => {
           {/* Free-First Pledge */}
           <div>
             <h4 style={{ fontSize: '1rem', marginBottom: '1.2rem', color: '#ffffff' }}>
-              Our Free-First Pledge 🛡️
+              {t('footer.freePledgeTitle', 'Our Free-First Pledge 🛡️')}
             </h4>
             <p
               style={{
@@ -207,7 +183,10 @@ export const Footer: React.FC = () => {
                 marginBottom: '1rem',
               }}
             >
-              FunnyChess is built with ₹0 initial budget using open-source technologies (Chess.js, Stockfish.js, browser Web Speech API, and Supabase free tier).
+              {t(
+                'footer.techDescription',
+                'Built with Chess.js, browser-based chess analysis, Web Speech API, and Supabase.'
+              )}
             </p>
             <div
               style={{
@@ -224,10 +203,10 @@ export const Footer: React.FC = () => {
               }}
             >
               <ShieldCheck size={14} />
-              <span>Zero Paywalls • Free to Play</span>
+              <span>{t('footer.zeroPaywalls', 'Zero Paywalls • Free to Play')}</span>
             </div>
 
-            {/* Live Verified Community Statistics */}
+            {/* Authentic Open Architecture Statement */}
             <div
               style={{
                 marginTop: '1.25rem',
@@ -252,37 +231,14 @@ export const Footer: React.FC = () => {
                   letterSpacing: '0.5px',
                 }}
               >
-                <span
-                  style={{
-                    width: '7px',
-                    height: '7px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10b981',
-                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.8)',
-                    display: 'inline-block',
-                  }}
-                />
-                <span>{t('footer.liveCommunity', 'Live Community')}</span>
+                <Sparkles size={13} color="var(--accent-gold)" />
+                <span>{t('footer.openArchitecture', 'Open Architecture')}</span>
               </div>
-              <div
-                style={{
-                  fontSize: '0.92rem',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                }}
-              >
-                <Users size={16} color="var(--accent-gold)" />
-                <span>
-                  {playerCount !== null
-                    ? `${playerCount} ${t('footer.registeredPlayers', 'Registered Chess Accounts')}`
-                    : t('footer.loadingCommunity', 'Active Chess Community')}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                {t('footer.verifiedDb', 'Real-time verified via Supabase')}
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {t(
+                  'footer.openArchitectureDesc',
+                  'Client-first chess logic running directly in your browser. ₹0 initial budget, completely open and accessible.'
+                )}
               </div>
             </div>
           </div>

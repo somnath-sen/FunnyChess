@@ -141,10 +141,11 @@
     "tagline": "शतरंज बिल्कुल कठिन नहीं है। बस आपने इसे अभी तक मजेदार तरीके से नहीं सीखा है।",
     "quote": "“मैंने अपनी रानी शिक्षा के उद्देश्य से कुर्बान की थी।”",
     "madeWith": "Made with ❤️ Somnath Sen",
-    "liveCommunity": "लाइव समुदाय",
-    "registeredPlayers": "पंजीकृत शतरंज खाते",
-    "loadingCommunity": "सक्रिय शतरंज समुदाय",
-    "verifiedDb": "Supabase द्वारा रीयल-टाइम सत्यापित"
+    "freePledgeTitle": "हमारा फ्री-फर्स्ट संकल्प 🛡️",
+    "techDescription": "Chess.js, ब्राउज़र-आधारित शतरंज विश्लेषण, Web Speech API और Supabase द्वारा निर्मित।",
+    "zeroPaywalls": "शून्य पेवॉल • खेलने के लिए मुफ्त",
+    "openArchitecture": "ओपन आर्किटेक्चर",
+    "openArchitectureDesc": "क्लाइंट-फर्स्ट शतरंज लॉजिक सीधे आपके ब्राउज़र में चलता है। ₹0 बजट, पूरी तरह खुला और सुलभ।"
   },
   "multiplayerAuth": {
     "signInToPlay": "दोस्त के साथ खेलने के लिए साइन इन करें",

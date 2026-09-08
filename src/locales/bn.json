@@ -141,10 +141,11 @@
     "tagline": "দাবা কিন্তু মোটেই কঠিন নয়। আপনি শুধু এখনও মজার উপায়ে শেখেননি।",
     "quote": "“আমি শিক্ষার স্বার্থে নিজের রানি উৎসর্গ করেছিলাম।”",
     "madeWith": "Made with ❤️ Somnath Sen",
-    "liveCommunity": "লাইভ কমিউনিটি",
-    "registeredPlayers": "নিবন্ধিত দাবা অ্যাকাউন্ট",
-    "loadingCommunity": "সক্রিয় দাবা সম্প্রদায়",
-    "verifiedDb": "Supabase দ্বারা রিয়েল-টাইমে যাচাইকৃত"
+    "freePledgeTitle": "আমাদের ফ্রি-ফার্স্ট অঙ্গীকার 🛡️",
+    "techDescription": "Chess.js, ব্রাউজার-ভিত্তিক দাবা বিশ্লেষণ, Web Speech API এবং Supabase দিয়ে নির্মিত।",
+    "zeroPaywalls": "জিরো পেওয়াল • সম্পূর্ণ বিনামূল্যে খেলা",
+    "openArchitecture": "ওপেন আর্কিটেকচার",
+    "openArchitectureDesc": "ক্লায়েন্ট-ফার্স্ট দাবা লজিক সরাসরি আপনার ব্রাউজারে চলে। ₹0 বাজেটে সম্পূর্ণ উন্মুক্ত এবং সবার জন্য সহজলভ্য।"
   },
   "multiplayerAuth": {
     "signInToPlay": "বন্ধুর সাথে খেলতে সাইন ইন করুন",
